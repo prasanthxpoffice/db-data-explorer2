@@ -1,0 +1,10 @@
+# Node / tooling
+node_modules/
+.env
+.vscode/
+*.log
+
+
+# .NET build
+server-dotnet/bin/
+server-dotnet/obj/
