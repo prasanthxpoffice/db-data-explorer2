@@ -1,0 +1,75 @@
+<div class="filter-panel right-panel" id="configPanel">
+  <div class="panel-toggle" id="toggleConfig">
+    <h3>Graph Settings</h3>
+    <button
+      type="button"
+      id="configChevron"
+      class="chevron-btn"
+      aria-label="Toggle settings"
+    >
+      v
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-section">
+      <label for="themeSelect">Theme</label>
+      <select id="themeSelect">
+        <option value="light" selected>Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+    <div class="panel-section">
+      <label for="autoExpandToggle">Auto expand nodes</label>
+      <label class="switch">
+        <input type="checkbox" id="autoExpandToggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="panel-section">
+      <label for="maxNodes">Max nodes</label>
+      <input id="maxNodes" type="number" min="10" value="200" />
+    </div>
+    <div class="panel-section graph-only">
+      <label for="layoutSelect">Layout</label>
+      <select id="layoutSelect">
+        <option value="cose" selected>COSE</option>
+        <option value="breadthfirst">Breadthfirst</option>
+        <option value="circle">Circle</option>
+        <option value="grid">Grid</option>
+        <option value="concentric">Concentric</option>
+      </select>
+    </div>
+    <div class="panel-section graph-only">
+      <label for="animateToggle">Animate layout</label>
+      <label class="switch">
+        <input type="checkbox" id="animateToggle" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="panel-section switch-group graph-only">
+      <label for="stopExpandToggle">Stop node expand</label>
+      <label class="switch">
+        <input type="checkbox" id="stopExpandToggle" />
+        <span class="slider"></span>
+      </label>
+      <label for="hideLeavesToggle">Hide leaves</label>
+      <label class="switch">
+        <input type="checkbox" id="hideLeavesToggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="panel-section graph-only">
+      <button id="exportPng" class="secondary">Export PNG</button>
+    </div>
+    <div class="panel-section">
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="en" selected>English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+    <div class="panel-section info-row">
+      <span id="status" class="status-text"></span>
+    </div>
+  </div>
+</div>

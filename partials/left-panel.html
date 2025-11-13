@@ -1,0 +1,57 @@
+<div class="filter-panel left-panel" id="filterPanel">
+  <div class="panel-toggle" id="toggleFilters">
+    <h3>Filters</h3>
+    <button
+      type="button"
+      id="filterChevron"
+      class="chevron-btn"
+      aria-label="Toggle filters"
+    >
+      v
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-section">
+      <label>Datasource</label>
+      <div class="multi-select" id="viewsDropdown">
+        <button
+          type="button"
+          id="viewsToggle"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+        >
+          Select views v
+        </button>
+        <div class="multi-options" id="viewsOptions"></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <label>Entity</label>
+      <select id="nodeType" style="min-width: 220px"></select>
+    </div>
+    <div class="panel-section">
+      <label>Entity node text</label>
+      <div class="suggestions">
+        <input id="itemSearch" placeholder="Type to search items" />
+        <div id="itemSuggestions" class="suggestions-panel"></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <label>Date range (optional)</label>
+      <div class="row">
+        <input id="fromDate" type="date" />
+        <input id="toDate" type="date" />
+      </div>
+    </div>
+    <div class="panel-section action-row">
+      <button id="addSelected">Add</button>
+    </div>
+    <div class="panel-section action-row">
+      <button id="showGraph">Show on graph</button>
+      <button id="clearGraph" class="secondary">Clear Graph</button>
+    </div>
+    <div class="panel-section selections-panel">
+      <ul id="selections"></ul>
+    </div>
+  </div>
+</div>

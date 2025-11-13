@@ -69,6 +69,7 @@
     autoExpandToggle: document.getElementById("autoExpandToggle"),
     themeSelect: document.getElementById("themeSelect"),
     exportPng: document.getElementById("exportPng"),
+    loadingOverlay: document.getElementById("loading-overlay"),
   };
 
   els.language.value = state.language;
@@ -94,6 +95,42 @@
     els.themeSelect.value = defaults.theme;
   }
   document.body.dataset.theme = state.theme;
+
+  let pendingLoads = 0;
+  let loadingTimer = null;
+  const LOADING_DELAY = 400;
+
+  function updateLoadingOverlay(show) {
+    if (!els.loadingOverlay) return;
+    if (show) {
+      els.loadingOverlay.removeAttribute("hidden");
+    } else {
+      els.loadingOverlay.setAttribute("hidden", "true");
+    }
+  }
+
+  function beginLoading() {
+    pendingLoads += 1;
+    if (!loadingTimer) {
+      loadingTimer = window.setTimeout(() => {
+        loadingTimer = null;
+        if (pendingLoads > 0) {
+          updateLoadingOverlay(true);
+        }
+      }, LOADING_DELAY);
+    }
+  }
+
+  function endLoading() {
+    pendingLoads = Math.max(0, pendingLoads - 1);
+    if (pendingLoads === 0) {
+      if (loadingTimer) {
+        clearTimeout(loadingTimer);
+        loadingTimer = null;
+      }
+      updateLoadingOverlay(false);
+    }
+  }
 
   function setStatus(msg) {
     els.status.textContent = msg;
@@ -215,12 +252,17 @@
       init.body = JSON.stringify(context);
     }
 
-    const res = await fetch(url, init);
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || res.statusText);
+    beginLoading();
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      return res.json();
+    } finally {
+      endLoading();
     }
-    return res.json();
   }
 
   function unwrapData(data) {
@@ -1086,4 +1128,21 @@
   updateGraphPadding();
 }
 
-document.addEventListener("DOMContentLoaded", initApp);
+let domReady = false;
+let partialsReady = false;
+
+function tryInit() {
+  if (domReady && partialsReady) {
+    initApp();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  domReady = true;
+  tryInit();
+});
+
+document.addEventListener("partials:ready", () => {
+  partialsReady = true;
+  tryInit();
+});

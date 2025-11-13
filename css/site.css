@@ -424,6 +424,12 @@ body[data-theme="dark"] .suggestions-panel button.active {
   background: #fff;
 }
 
+body[data-theme="dark"] .selections-panel li {
+  border-color: #334155;
+  background: #111a2a;
+  color: #f5f7ff;
+}
+
 .info-row {
   display: flex;
   align-items: center;
