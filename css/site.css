@@ -60,6 +60,19 @@ body[data-theme="dark"] #cy {
 #left-panel-root {
   left: 16px;
 }
+#right-panel-root {
+  right: 16px;
+}
+
+html[dir="rtl"] #left-panel-root {
+  left: auto;
+  right: 16px;
+}
+
+html[dir="rtl"] #right-panel-root {
+  right: auto;
+  left: 16px;
+}
 
 #right-panel-root {
   right: 16px;
@@ -100,6 +113,19 @@ body[data-theme="dark"] .filter-panel {
 #left-panel-root .filter-panel.collapsed {
   transform: translateX(calc(-100% + 52px));
   opacity: 0.85;
+}
+
+#right-panel-root .filter-panel.collapsed {
+  transform: translateX(calc(100% - 52px));
+  opacity: 0.85;
+}
+
+html[dir="rtl"] #left-panel-root .filter-panel.collapsed {
+  transform: translateX(calc(100% - 52px));
+}
+
+html[dir="rtl"] #right-panel-root .filter-panel.collapsed {
+  transform: translateX(calc(-100% + 52px));
 }
 
 #right-panel-root .filter-panel.collapsed {

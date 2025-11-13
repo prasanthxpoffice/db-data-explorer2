@@ -1,4 +1,4 @@
-﻿function initApp() {
+function initApp() {
   if (!window.APP_CONFIG) {
     const fallback = document.getElementById("status");
     if (fallback) {
@@ -72,7 +72,15 @@
     loadingOverlay: document.getElementById("loading-overlay"),
   };
 
-  els.language.value = state.language;
+  const setStatus = (msg) => {
+    if (els.status) {
+      els.status.textContent = msg;
+    }
+  };
+
+  if (els.language) {
+    els.language.value = state.language;
+  }
   if (els.maxNodes) {
     els.maxNodes.value = defaults.maxNodes;
   }
@@ -96,45 +104,29 @@
   }
   document.body.dataset.theme = state.theme;
 
-  let pendingLoads = 0;
-  let loadingTimer = null;
-  const LOADING_DELAY = 400;
-
-  function updateLoadingOverlay(show) {
-    if (!els.loadingOverlay) return;
-    if (show) {
-      els.loadingOverlay.removeAttribute("hidden");
-    } else {
-      els.loadingOverlay.setAttribute("hidden", "true");
-    }
-  }
-
-  function beginLoading() {
-    pendingLoads += 1;
-    if (!loadingTimer) {
-      loadingTimer = window.setTimeout(() => {
-        loadingTimer = null;
-        if (pendingLoads > 0) {
-          updateLoadingOverlay(true);
-        }
-      }, LOADING_DELAY);
-    }
-  }
-
-  function endLoading() {
-    pendingLoads = Math.max(0, pendingLoads - 1);
-    if (pendingLoads === 0) {
-      if (loadingTimer) {
-        clearTimeout(loadingTimer);
-        loadingTimer = null;
-      }
-      updateLoadingOverlay(false);
-    }
-  }
-
-  function setStatus(msg) {
-    els.status.textContent = msg;
-  }
+  const loadingTracker = window.GraphApp.createLoadingTracker(
+    els.loadingOverlay
+  );
+  const data = window.GraphApp.createDataModule({
+    APP_CONFIG,
+    state,
+    els,
+    defaults,
+    setStatus,
+    beginLoading: loadingTracker.beginLoading,
+    endLoading: loadingTracker.endLoading,
+  });
+  const graph = window.GraphApp.createGraphModule({
+    state,
+    els,
+    defaults,
+    dateDefaults,
+    DEFAULT_NODE_COLOR,
+    setStatus,
+    callApi: data.callApi,
+    unwrapData: data.unwrapData,
+    getMaxNodes,
+  });
 
   function dirFor(lang) {
     return lang === "ar" ? "rtl" : "ltr";
@@ -146,21 +138,8 @@
   function applyLanguageChrome() {
     document.documentElement.lang = state.language;
     document.documentElement.dir = dirFor(state.language);
-    document.body.style.textAlign = alignFor(state.language);
-    els.language.value = state.language;
-  }
-
-  function deriveArrows(directionRaw) {
-    const direction = (directionRaw || "").trim();
-    switch (direction) {
-      case "->":
-        return { sourceArrow: "none", targetArrow: "triangle" };
-      case "<-":
-        return { sourceArrow: "triangle", targetArrow: "none" };
-      case "<->":
-        return { sourceArrow: "triangle", targetArrow: "triangle" };
-      default:
-        return { sourceArrow: "none", targetArrow: "none" };
+    if (els.language) {
+      els.language.value = state.language;
     }
   }
 
@@ -197,7 +176,7 @@
     if (!els.configPanel) return;
     if (configCollapsed) {
       els.configPanel.classList.add("collapsed");
-      if (els.configChevron) els.configChevron.textContent = "<";
+      if (els.configChevron) els.configChevron.textContent = ">";
     } else {
       els.configPanel.classList.remove("collapsed");
       if (els.configChevron) els.configChevron.textContent = "v";
@@ -216,243 +195,15 @@
     els.configChevron &&
     (!els.toggleConfig || !els.toggleConfig.contains(els.configChevron))
   ) {
-    els.configChevron?.addEventListener("click", (event) => {
+    els.configChevron.addEventListener("click", (event) => {
       event.stopPropagation();
       configCollapsed = !configCollapsed;
       updateConfigPanel();
     });
   }
 
-  function withContext(payload) {
-    return { ...(payload || {}), lang: state.language, userId: state.userId };
-  }
-
-  function buildUrl(endpoint, params) {
-    const url = new URL(endpoint.path, APP_CONFIG.baseUrl);
-    if (endpoint.method === "GET" && params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value === undefined || value === null || value === "") return;
-        url.searchParams.set(key, value);
-      });
-    }
-    return url.toString();
-  }
-
-  async function callApi(key, payload) {
-    const endpoint = APP_CONFIG.api[key];
-    if (!endpoint) {
-      throw new Error(`Unknown API endpoint: ${key}`);
-    }
-    const context = withContext(payload);
-    const url = buildUrl(endpoint, context);
-    const init = { method: endpoint.method };
-
-    if (endpoint.method !== "GET") {
-      init.headers = { "Content-Type": "application/json" };
-      init.body = JSON.stringify(context);
-    }
-
-    beginLoading();
-    try {
-      const res = await fetch(url, init);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
-      }
-      return res.json();
-    } finally {
-      endLoading();
-    }
-  }
-
-  function unwrapData(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.data)) return data.data;
-    return [];
-  }
-
-  function getViewId(value) {
-    const parsed = parseInt(value, 10);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-
-  function updateViewIndicator() {
-    const label = state.viewIds.length
-      ? `${state.viewIds.length} view(s)`
-      : "Select views";
-    els.viewsToggle.textContent = `${label} v`;
-    els.viewsToggle.setAttribute("aria-label", label);
-  }
-
-  function renderViewsList() {
-    const validIds = new Set();
-    const items = state.views
-      .map((v) => {
-        const rawId = v.ViewID ?? v.viewID;
-        const id = getViewId(rawId);
-        if (id === null) {
-          return "";
-        }
-        validIds.add(id);
-        const checked = state.viewIds.includes(id) ? "checked" : "";
-        const description =
-          v.viewDescription ??
-          v.ViewDescription ??
-          v.viewName ??
-          v.ViewName ??
-          `View ${id}`;
-        return `<label><input type="checkbox" value="${rawId}" ${checked} /> ${description}</label>`;
-      })
-      .filter(Boolean);
-
-    state.viewIds = state.viewIds.filter((id) => validIds.has(id));
-    els.viewsOptions.innerHTML = items.length
-      ? items.join("")
-      : '<small class="hint">No views available.</small>';
-    updateViewIndicator();
-  }
-
-  const handleOutsideClick = (event) => {
-    if (!els.viewsDropdown.contains(event.target)) {
-      setViewsDropdownOpen(false);
-    }
-  };
-
-  function setViewsDropdownOpen(open) {
-    if (open) {
-      els.viewsDropdown.classList.add("open");
-      document.addEventListener("click", handleOutsideClick);
-    } else {
-      els.viewsDropdown.classList.remove("open");
-      document.removeEventListener("click", handleOutsideClick);
-    }
-    els.viewsToggle.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-
-  async function loadViews() {
-    try {
-      setStatus("Loading viewsâ€¦");
-      const resp = await callApi("views");
-      state.views = unwrapData(resp);
-      renderViewsList();
-      setStatus("Views loaded.");
-      await loadNodeTypesForViews();
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
-
-  async function loadNodeTypesForViews() {
-    if (!state.viewIds.length) {
-      state.nodeTypes = [];
-      renderNodeTypes();
-      clearItems(true);
-      return;
-    }
-    try {
-      setStatus("Loading node typesâ€¦");
-      const resp = await callApi("nodeTypes", { viewIds: state.viewIds });
-      state.nodeTypes = unwrapData(resp);
-      renderNodeTypes();
-      setStatus(`Node types: ${state.nodeTypes.length}`);
-      if (els.itemSearch.value) {
-        scheduleLoadItems();
-      }
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
-
-  function renderNodeTypes() {
-    els.nodeType.innerHTML = state.nodeTypes
-      .map((nt) => {
-        const id = nt.colId ?? nt.ColId ?? "";
-        const label = nt.label ?? nt.Label ?? id;
-        return `<option value="${id}">${label}</option>`;
-      })
-      .join("");
-  }
-
-  let visibleItems = [];
-
-  function hideSuggestions() {
-    if (!els.itemSuggestions) return;
-    els.itemSuggestions.classList.remove("show");
-    els.itemSuggestions.innerHTML = "";
-  }
-
-  function renderItems() {
-    if (!els.itemSuggestions) return;
-    const query = (els.itemSearch.value || "").trim().toLowerCase();
-    const list = query
-      ? state.items.filter((item) =>
-          (item.text ?? item.Text ?? "").toLowerCase().includes(query)
-        )
-      : state.items;
-    visibleItems = list;
-    if (!list.length || !query) {
-      hideSuggestions();
-      return;
-    }
-
-    els.itemSuggestions.innerHTML = list
-      .map((item, index) => {
-        const id = `${item.id ?? item.Id ?? ""}`;
-        const text = item.text ?? item.Text ?? "(no text)";
-        const active =
-          state.activeItem && state.activeItem.id === id ? "active" : "";
-        return `<button type="button" data-index="${index}" class="${active}">${text}</button>`;
-      })
-      .join("");
-    els.itemSuggestions.classList.add("show");
-  }
-
-  function clearItems(resetSearch = false) {
-    state.items = [];
-    state.activeItem = null;
-    if (resetSearch && els.itemSearch) {
-      els.itemSearch.value = "";
-    }
-    hideSuggestions();
-  }
-
-  let loadItemsTimer = null;
-
-  function scheduleLoadItems() {
-    const query = (els.itemSearch.value || "").trim();
-    if (!state.viewIds.length || !els.nodeType.value || !query) {
-      hideSuggestions();
-      return;
-    }
-    if (loadItemsTimer) {
-      clearTimeout(loadItemsTimer);
-    }
-    loadItemsTimer = window.setTimeout(loadItemsFromServer, 300);
-  }
-
-  async function loadItemsFromServer() {
-    loadItemsTimer = null;
-    const colId = els.nodeType.value;
-    if (!colId || !state.viewIds.length) {
-      return;
-    }
-    try {
-      setStatus("Loading itemsâ€¦");
-      const resp = await callApi("items", {
-        viewIds: state.viewIds,
-        colId,
-        maxCount: defaults.maxItems,
-      });
-      state.items = unwrapData(resp);
-      renderItems();
-      setStatus(`Items loaded: ${state.items.length}`);
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
-
   function renderSelections() {
+    if (!els.selections) return;
     els.selections.innerHTML = state.selected
       .map(
         (s, i) => `
@@ -484,349 +235,47 @@
     }
   }
 
+  function setGraphReadyState(hasGraph) {
+    document.body.classList.toggle("graph-ready", hasGraph);
+    if (els.clearGraph) {
+      els.clearGraph.style.display = hasGraph ? "block" : "none";
+    }
+  }
+
   function getMaxNodes() {
-    const value = parseInt(els.maxNodes.value, 10);
+    const value = parseInt(els.maxNodes?.value ?? "", 10);
     return Number.isFinite(value) ? Math.max(10, value) : defaults.maxNodes;
   }
 
-  let cy = null;
-  const expandedNodes = new Set();
-  let autoExpandRunning = false;
-  let autoExpandGeneration = 0;
-
-  function resetAutoExpandProgress() {
-    expandedNodes.clear();
-    autoExpandRunning = false;
-    if (cy && els.autoExpandToggle?.checked) {
-      queueAutoExpand(true);
-    }
-  }
-  async function expandNode({ sourceColId, sourceId, fromDate, toDate }) {
-    const resp = await callApi("expand", {
-      viewIds: state.viewIds,
-      sourceColId,
-      sourceId,
-      fromDate: fromDate ?? dateDefaults.from,
-      toDate: toDate ?? dateDefaults.to,
-      maxNodes: getMaxNodes(),
-    });
-    return unwrapData(resp);
+  function updateGraphPadding() {
+    const graphSurface = document.querySelector(".wrap");
+    if (!graphSurface) return;
+    // Panels are absolutely positioned; graph already full screen.
   }
 
-  async function appendExpansionResults(sourceKey, { force = false } = {}) {
-    if (!cy) return false;
-    if (!force && expandedNodes.has(sourceKey)) return false;
-    const parsed = (sourceKey || "").split(":");
-    if (parsed.length !== 2) {
-      expandedNodes.add(sourceKey);
-      return false;
-    }
-    const [colId, nodeId] = parsed;
-    const rows = await expandNode({
-      sourceColId: colId,
-      sourceId: nodeId,
-      fromDate: dateDefaults.from,
-      toDate: dateDefaults.to,
-    });
-
-    const nodesToAdd = [];
-    const edgesToAdd = [];
-
-    rows.forEach((row) => {
-      const displayCol = row.displayCol ?? row.DisplayCol ?? "";
-      const id = `${row.id ?? row.Id ?? ""}`;
-      const text = row.text ?? row.Text ?? "(no text)";
-      const label =
-        row.edgeLabel ?? row.EdgeLabel ?? row.ed_r_ed ?? row.ED_R_ED ?? "";
-      const direction = row.direction ?? row.Direction ?? "";
-      const color = row.color ?? row.Color ?? DEFAULT_NODE_COLOR;
-      const { sourceArrow, targetArrow } = deriveArrows(direction);
-
-      const targetKey = `${displayCol}:${id}`;
-
-      const existingNode = cy.getElementById(targetKey);
-      if (existingNode && existingNode.length) {
-        if (!existingNode.data("color") && color) {
-          existingNode.data("color", color);
-        }
-      } else {
-        nodesToAdd.push({
-          data: {
-            id: targetKey,
-            type: displayCol,
-            label: text,
-            color,
-            seed: false,
-          },
-        });
-      }
-
-      const edgeIdentifier = `${sourceKey}|${targetKey}|${
-        direction || "none"
-      }`;
-      const forwardEdge = cy.$(
-        `edge[source = "${sourceKey}"][target = "${targetKey}"]`
-      );
-      const reverseEdge = cy.$(
-        `edge[source = "${targetKey}"][target = "${sourceKey}"]`
-      );
-      const existingEdge =
-        forwardEdge.length > 0
-          ? forwardEdge
-          : reverseEdge.length > 0
-          ? reverseEdge
-          : null;
-
-      if (existingEdge && existingEdge.length) {
-        const edgeEle = existingEdge[0];
-        if (!edgeEle.data("label") && label) {
-          edgeEle.data("label", label);
-        }
-      } else {
-        edgesToAdd.push({
-          data: {
-            id: edgeIdentifier,
-            source: sourceKey,
-            target: targetKey,
-            label,
-            direction,
-            sourceArrow,
-            targetArrow,
-          },
-        });
-      }
-    });
-
-    if (nodesToAdd.length) {
-      cy.add(nodesToAdd);
-    }
-    if (edgesToAdd.length) {
-      cy.add(edgesToAdd);
-    }
-    if (nodesToAdd.length || edgesToAdd.length) {
-      cy.layout(getLayoutOptions()).run();
-    }
-    updateLeafVisibility();
-
-    expandedNodes.add(sourceKey);
-    return nodesToAdd.length > 0 || edgesToAdd.length > 0;
-  }
-
-  function getGraphPalette() {
-    return state.theme === "dark"
-      ? {
-          nodeText: "#0f172a",
-          nodeOutline: "#f8faff",
-          nodeOutlineWidth: 2,
-          nodeBorder: "#0f172a",
-          edgeLine: "#ffffff",
-          edgeLabel: "#ffffff",
-          edgeOutline: "#0b1423",
-          edgeOutlineWidth: 2,
-        }
-      : {
-          nodeText: "#0f172a",
-          nodeOutline: "#ffffff",
-          nodeOutlineWidth: 0,
-          nodeBorder: "#0f172a",
-          edgeLine: "#1f2937",
-          edgeLabel: "#111111",
-          edgeOutline: "#ffffff",
-          edgeOutlineWidth: 0,
-        };
-  }
-
-  function buildGraphStyle() {
-    const palette = getGraphPalette();
-    return [
-      {
-        selector: "node",
-        style: {
-          label: "data(label)",
-          "text-valign": "center",
-          "text-wrap": "wrap",
-          "text-max-width": "80px",
-          color: palette.nodeText,
-          "text-outline-color": palette.nodeOutline,
-          "text-outline-width": palette.nodeOutlineWidth,
-          "background-color": "data(color)",
-          "border-width": 1,
-          "border-color": palette.nodeBorder,
-          width: 80,
-          height: 80,
-          "font-size": 12,
-        },
-      },
-      {
-        selector: "edge",
-        style: {
-          "curve-style": "bezier",
-          "target-arrow-shape": "data(targetArrow)",
-          "source-arrow-shape": "data(sourceArrow)",
-          label: "data(label)",
-          width: 2,
-          "line-color": palette.edgeLine,
-          "target-arrow-color": palette.edgeLine,
-          "source-arrow-color": palette.edgeLine,
-          color: palette.edgeLabel,
-          "font-size": 11,
-          "text-outline-color": palette.edgeOutline,
-          "text-outline-width": palette.edgeOutlineWidth,
-        },
-      },
-      { selector: "node.leaf-hidden", style: { display: "none" } },
-      { selector: "edge.leaf-edge-hidden", style: { display: "none" } },
-    ];
-  }
-
-  function getLayoutOptions() {
-    const layoutName = els.layoutSelect?.value || "cose";
-    const animate = els.animateToggle ? !!els.animateToggle.checked : true;
-    return { name: layoutName, padding: 20, animate };
-  }
-
-  function nodeIsSeed(node) {
-    return !!node.data("seed");
-  }
-
-  function isLeafNode(node) {
-    if (!node || nodeIsSeed(node)) return false;
-    const degree = node
-      .connectedEdges()
-      .filter((edge) => {
-        const sourceId = edge.source().id();
-        const targetId = edge.target().id();
-        const nodeId = node.id();
-        const isSelfLoop = sourceId === nodeId && targetId === nodeId;
-        return !isSelfLoop;
-      }).length;
-    if (degree === 0) return true;
-    return degree <= 1;
-  }
-
-  function updateLeafVisibility() {
-    if (!cy) return;
-    const hide = !!(els.hideLeavesToggle && els.hideLeavesToggle.checked);
-    cy.batch(() => {
-      cy.nodes().forEach((node) => {
-        const shouldHide = hide && isLeafNode(node);
-        node.toggleClass("leaf-hidden", shouldHide);
-      });
-      cy.edges().forEach((edge) => {
-        const hideEdge =
-          hide &&
-          (edge.source().hasClass("leaf-hidden") ||
-            edge.target().hasClass("leaf-hidden"));
-        edge.toggleClass("leaf-edge-hidden", hideEdge);
-      });
-    });
-  }
-
-  function queueAutoExpand(force = false) {
-    if (!els.autoExpandToggle || !els.autoExpandToggle.checked) return;
-    if (els.stopExpandToggle?.checked) return;
-    if (!cy) return;
-    if (autoExpandRunning && !force) return;
-
-    autoExpandGeneration++;
-    autoExpandPendingNodes(autoExpandGeneration);
-  }
-
-  async function autoExpandPendingNodes(token) {
-    if (!cy) return;
-    autoExpandRunning = true;
-    try {
-      setStatus("Auto expanding nodes...");
-      while (
-        cy &&
-        token === autoExpandGeneration &&
-        els.autoExpandToggle?.checked &&
-        !(els.stopExpandToggle && els.stopExpandToggle.checked)
-      ) {
-        const nextNode = cy
-          .nodes()
-          .toArray()
-          .find((n) => !expandedNodes.has(n.id()));
-        if (!nextNode) break;
-        await appendExpansionResults(nextNode.id());
-      }
-      if (token === autoExpandGeneration) {
-        setStatus("Auto expand complete.");
-      }
-    } catch (err) {
-      if (token === autoExpandGeneration) {
-        setStatus(err.message);
-      }
-    } finally {
-      if (token === autoExpandGeneration) {
-        autoExpandRunning = false;
-      }
-    }
-  }
-
-  function renderGraph(nodes, edges) {
-    const style = buildGraphStyle();
-
-    const layoutOptions = getLayoutOptions();
-
-    if (!cy) {
-      cy = cytoscape({
-        container: els.graph,
-        elements: { nodes, edges },
-        layout: layoutOptions,
-        style,
-      });
-    } else {
-      cy.elements().remove();
-      cy.add(nodes).add(edges);
-      cy.style(style);
-      cy.layout(layoutOptions).run();
-    }
-
-    updateLeafVisibility();
-
-    cy.removeListener("tap", "node");
-    cy.on("tap", "node", async (event) => {
-      if (els.stopExpandToggle && els.stopExpandToggle.checked) {
-        return;
-      }
-      const tapped = event.target;
-      if (!tapped || !tapped.id()) return;
-      setStatus("Expanding node...");
-      try {
-        await appendExpansionResults(tapped.id(), { force: true });
-        queueAutoExpand();
-        setGraphReadyState(true);
-        setStatus("Node expanded.");
-      } catch (err) {
-        setStatus(err.message);
-      }
-    });
-  }
-
-  els.language.onchange = () => {
+  els.language?.addEventListener("change", () => {
     state.language = els.language.value;
     applyLanguageChrome();
-    clearItems(true);
-    loadViews();
-  };
-
-  els.viewsToggle.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const isOpen = els.viewsDropdown.classList.contains("open");
-    setViewsDropdownOpen(!isOpen);
+    data.clearItems(true);
+    data.loadViews();
   });
 
-  els.viewsOptions.addEventListener("click", (event) => {
+  els.viewsToggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = els.viewsDropdown?.classList.contains("open");
+    data.setViewsDropdownOpen(!isOpen);
+  });
+
+  els.viewsOptions?.addEventListener("click", (event) => {
     event.stopPropagation();
   });
 
-  els.viewsOptions.addEventListener("change", (event) => {
+  els.viewsOptions?.addEventListener("change", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) {
       return;
     }
-    const id = getViewId(target.value);
+    const id = data.getViewId(target.value);
     if (id === null) {
       return;
     }
@@ -837,33 +286,33 @@
     } else {
       state.viewIds = state.viewIds.filter((v) => v !== id);
     }
-    updateViewIndicator();
-    clearItems(true);
-    loadNodeTypesForViews();
-    if (els.itemSearch.value) {
-      scheduleLoadItems();
+    data.updateViewIndicator();
+    data.clearItems(true);
+    data.loadNodeTypesForViews();
+    if (els.itemSearch?.value) {
+      data.scheduleLoadItems();
     }
-    if (cy && els.autoExpandToggle?.checked) {
-      resetAutoExpandProgress();
+    if (els.autoExpandToggle?.checked) {
+      graph.resetAutoExpandProgress();
     }
   });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      setViewsDropdownOpen(false);
+      data.setViewsDropdownOpen(false);
     }
   });
 
-  els.nodeType.addEventListener("change", () => {
-    clearItems(false);
-    if (els.itemSearch.value) {
-      scheduleLoadItems();
+  els.nodeType?.addEventListener("change", () => {
+    data.clearItems(false);
+    if (els.itemSearch?.value) {
+      data.scheduleLoadItems();
     }
   });
 
-  els.itemSearch.addEventListener("input", () => {
-    renderItems();
-    scheduleLoadItems();
+  els.itemSearch?.addEventListener("input", () => {
+    data.renderItems();
+    data.scheduleLoadItems();
   });
 
   if (els.itemSuggestions) {
@@ -873,7 +322,7 @@
         return;
       }
       const index = Number(button.dataset.index);
-      const item = visibleItems[index];
+      const item = data.getVisibleItems()[index];
       if (!item) {
         return;
       }
@@ -882,7 +331,7 @@
         text: item.text ?? item.Text ?? "(no text)",
       };
       els.itemSearch.value = state.activeItem.text;
-      hideSuggestions();
+      data.hideSuggestions();
     });
   }
 
@@ -892,14 +341,14 @@
       !els.itemSuggestions.contains(event.target) &&
       event.target !== els.itemSearch
     ) {
-      hideSuggestions();
+      data.hideSuggestions();
     }
   });
 
-  els.addSelected.onclick = () => {
-    const colId = els.nodeType.value;
+  els.addSelected?.addEventListener("click", () => {
+    const colId = els.nodeType?.value;
     const colLabel =
-      els.nodeType.options[els.nodeType.selectedIndex]?.textContent ?? colId;
+      els.nodeType?.options[els.nodeType.selectedIndex]?.textContent ?? colId;
     if (!colId) {
       setStatus("Pick an entity first.");
       return;
@@ -910,17 +359,18 @@
       return;
     }
 
-    const fromDate = (els.fromDate.value || "").trim();
-    const toDate = (els.toDate.value || "").trim();
-
     const duplicate = state.selected.some(
-      (entry) => entry.colId === colId && entry.id === state.activeItem.id
+      (entry) =>
+        entry.colId === colId && entry.id === state.activeItem?.id
     );
 
     if (duplicate) {
       setStatus("This item is already in the list.");
       return;
     }
+
+    const fromDate = (els.fromDate?.value || "").trim();
+    const toDate = (els.toDate?.value || "").trim();
 
     state.selected.push({
       colId,
@@ -934,81 +384,52 @@
     });
 
     state.activeItem = null;
-    els.itemSearch.value = "";
-    hideSuggestions();
+    if (els.itemSearch) els.itemSearch.value = "";
+    data.hideSuggestions();
     renderSelections();
-  };
+  });
 
-  const setGraphReadyState = (hasGraph) => {
-    document.body.classList.toggle("graph-ready", hasGraph);
-    if (els.clearGraph) {
-      els.clearGraph.style.display = hasGraph ? "block" : "none";
-    }
-    updateGraphPadding();
-  };
-
-  function updateGraphPadding() {
-    if (!els.graph) return;
-    els.graph.style.marginLeft = "0";
-    els.graph.style.marginRight = "0";
-  }
-
-  els.clearGraph.onclick = () => {
-    if (cy) {
-      cy.elements().remove();
-      cy = null;
-    }
-    expandedNodes.clear();
-    autoExpandRunning = false;
+  els.clearGraph?.addEventListener("click", () => {
+    graph.clearGraph();
     state.selected = [];
     renderSelections();
     setGraphReadyState(false);
     setStatus("Graph cleared.");
-  };
+  });
 
   const refreshGraphLayout = () => {
-    if (!cy) return;
-    const layoutName = els.layoutSelect?.value || defaults.defaultLayout;
-    const animate = els.animateToggle
-      ? !!els.animateToggle.checked
-      : defaults.animateLayout;
-    cy.layout({ name: layoutName, padding: 20, animate }).run();
+    graph.runLayout();
   };
 
   els.layoutSelect?.addEventListener("change", refreshGraphLayout);
   els.animateToggle?.addEventListener("change", refreshGraphLayout);
 
-  els.hideLeavesToggle?.addEventListener("change", () => {
-    updateLeafVisibility();
-  });
-
-  els.autoExpandToggle?.addEventListener("change", () => {
-    if (els.autoExpandToggle.checked) {
-      resetAutoExpandProgress();
-    } else {
-      autoExpandGeneration++;
-      autoExpandRunning = false;
-    }
-  });
-
   els.themeSelect?.addEventListener("change", () => {
     state.theme = els.themeSelect.value;
     document.body.dataset.theme = state.theme;
-    if (cy) {
-      cy.style(buildGraphStyle());
-    }
+    graph.refreshStyle();
   });
 
   els.exportPng?.addEventListener("click", () => {
-    if (!cy) return;
-    const png = cy.png({ full: true, scale: 2 });
+    if (!window.cy) return;
+    const png = window.cy.png({ full: true, scale: 2 });
     const link = document.createElement("a");
     link.href = png;
     link.download = `graph-${Date.now()}.png`;
     link.click();
   });
 
-  els.showGraph.onclick = async () => {
+  els.autoExpandToggle?.addEventListener("change", () => {
+    if (els.autoExpandToggle.checked) {
+      graph.resetAutoExpandProgress();
+    }
+  });
+
+  els.hideLeavesToggle?.addEventListener("change", () => {
+    graph.updateLeafVisibility();
+  });
+
+  els.showGraph?.addEventListener("click", async () => {
     try {
       if (!state.selected.length) {
         setStatus("Add at least one selection.");
@@ -1020,13 +441,12 @@
       }
 
       setStatus("Building graph…");
-      expandedNodes.clear();
+      graph.resetAutoExpandProgress();
 
       const nodes = new Map();
       const edges = new Map();
       const edgePairMap = new Map();
       const nodeKey = (colId, id) => `${colId}:${id}`;
-      const edgeKey = (src, tgt) => `${src}|${tgt}`;
       const undirectedKey = (a, b) => (a < b ? `${a}||${b}` : `${b}||${a}`);
 
       state.selected.forEach((sel) => {
@@ -1043,7 +463,7 @@
       });
 
       for (const sel of state.selected) {
-        const resp = await callApi("expand", {
+        const resp = await data.callApi("expand", {
           viewIds: state.viewIds,
           sourceColId: sel.colId,
           sourceId: sel.id,
@@ -1051,7 +471,7 @@
           toDate: sel.resolvedToDate ?? dateDefaults.to,
           maxNodes: getMaxNodes(),
         });
-        const rows = unwrapData(resp);
+        const rows = data.unwrapData(resp);
 
         rows.forEach((row) => {
           const displayCol = row.displayCol ?? row.DisplayCol ?? "";
@@ -1061,7 +481,7 @@
             row.edgeLabel ?? row.EdgeLabel ?? row.ed_r_ed ?? row.ED_R_ED ?? "";
           const direction = row.direction ?? row.Direction ?? "";
           const color = row.color ?? row.Color ?? DEFAULT_NODE_COLOR;
-          const { sourceArrow, targetArrow } = deriveArrows(direction);
+          const { sourceArrow, targetArrow } = graph.deriveArrows(direction);
 
           const targetKey = nodeKey(displayCol, id);
           if (!nodes.has(targetKey)) {
@@ -1105,26 +525,23 @@
           });
           edgePairMap.set(pairKey, edgeIdentifier);
         });
-
-        expandedNodes.add(nodeKey(sel.colId, sel.id));
       }
 
-      renderGraph(Array.from(nodes.values()), Array.from(edges.values()));
+      graph.renderGraph(
+        Array.from(nodes.values()),
+        Array.from(edges.values())
+      );
       setGraphReadyState(true);
       setStatus(`Graph ready. Nodes: ${nodes.size}, Edges: ${edges.size}`);
-      if (defaults.autoCollapse) {
-        filtersCollapsed = true;
-        updateFilterPanel();
-      }
-      queueAutoExpand();
+      graph.queueAutoExpand();
     } catch (err) {
       setStatus(err.message);
     }
-  };
+  });
 
   applyLanguageChrome();
   renderSelections();
-  loadViews();
+  data.loadViews();
   updateGraphPadding();
 }
 
