@@ -450,6 +450,15 @@
   let cy = null;
   const expandedNodes = new Set();
   let autoExpandRunning = false;
+  let autoExpandGeneration = 0;
+
+  function resetAutoExpandProgress() {
+    expandedNodes.clear();
+    autoExpandRunning = false;
+    if (cy && els.autoExpandToggle?.checked) {
+      queueAutoExpand(true);
+    }
+  }
   async function expandNode({ sourceColId, sourceId, fromDate, toDate }) {
     const resp = await callApi("expand", {
       viewIds: state.viewIds,
@@ -493,17 +502,6 @@
 
       const targetKey = `${displayCol}:${id}`;
 
-      if (
-        els.hideLeavesToggle &&
-        els.hideLeavesToggle.checked &&
-        (row.isLeaf === true ||
-          row.isLeaf === 1 ||
-          row.IsLeaf === true ||
-          row.IsLeaf === 1)
-      ) {
-        return;
-      }
-
       const existingNode = cy.getElementById(targetKey);
       if (existingNode && existingNode.length) {
         if (!existingNode.data("color") && color) {
@@ -516,6 +514,7 @@
             type: displayCol,
             label: text,
             color,
+            seed: false,
           },
         });
       }
@@ -565,6 +564,7 @@
     if (nodesToAdd.length || edgesToAdd.length) {
       cy.layout(getLayoutOptions()).run();
     }
+    updateLeafVisibility();
 
     expandedNodes.add(sourceKey);
     return nodesToAdd.length > 0 || edgesToAdd.length > 0;
@@ -632,6 +632,8 @@
           "text-outline-width": palette.edgeOutlineWidth,
         },
       },
+      { selector: "node.leaf-hidden", style: { display: "none" } },
+      { selector: "edge.leaf-edge-hidden", style: { display: "none" } },
     ];
   }
 
@@ -641,20 +643,61 @@
     return { name: layoutName, padding: 20, animate };
   }
 
-  function queueAutoExpand() {
-    if (!els.autoExpandToggle || !els.autoExpandToggle.checked) return;
-    if (els.stopExpandToggle?.checked) return;
-    if (!cy || autoExpandRunning) return;
-    autoExpandPendingNodes();
+  function nodeIsSeed(node) {
+    return !!node.data("seed");
   }
 
-  async function autoExpandPendingNodes() {
+  function isLeafNode(node) {
+    if (!node || nodeIsSeed(node)) return false;
+    const degree = node
+      .connectedEdges()
+      .filter((edge) => {
+        const sourceId = edge.source().id();
+        const targetId = edge.target().id();
+        const nodeId = node.id();
+        const isSelfLoop = sourceId === nodeId && targetId === nodeId;
+        return !isSelfLoop;
+      }).length;
+    if (degree === 0) return true;
+    return degree <= 1;
+  }
+
+  function updateLeafVisibility() {
+    if (!cy) return;
+    const hide = !!(els.hideLeavesToggle && els.hideLeavesToggle.checked);
+    cy.batch(() => {
+      cy.nodes().forEach((node) => {
+        const shouldHide = hide && isLeafNode(node);
+        node.toggleClass("leaf-hidden", shouldHide);
+      });
+      cy.edges().forEach((edge) => {
+        const hideEdge =
+          hide &&
+          (edge.source().hasClass("leaf-hidden") ||
+            edge.target().hasClass("leaf-hidden"));
+        edge.toggleClass("leaf-edge-hidden", hideEdge);
+      });
+    });
+  }
+
+  function queueAutoExpand(force = false) {
+    if (!els.autoExpandToggle || !els.autoExpandToggle.checked) return;
+    if (els.stopExpandToggle?.checked) return;
+    if (!cy) return;
+    if (autoExpandRunning && !force) return;
+
+    autoExpandGeneration++;
+    autoExpandPendingNodes(autoExpandGeneration);
+  }
+
+  async function autoExpandPendingNodes(token) {
     if (!cy) return;
     autoExpandRunning = true;
     try {
       setStatus("Auto expanding nodes...");
       while (
         cy &&
+        token === autoExpandGeneration &&
         els.autoExpandToggle?.checked &&
         !(els.stopExpandToggle && els.stopExpandToggle.checked)
       ) {
@@ -665,11 +708,17 @@
         if (!nextNode) break;
         await appendExpansionResults(nextNode.id());
       }
-      setStatus("Auto expand complete.");
+      if (token === autoExpandGeneration) {
+        setStatus("Auto expand complete.");
+      }
     } catch (err) {
-      setStatus(err.message);
+      if (token === autoExpandGeneration) {
+        setStatus(err.message);
+      }
     } finally {
-      autoExpandRunning = false;
+      if (token === autoExpandGeneration) {
+        autoExpandRunning = false;
+      }
     }
   }
 
@@ -691,6 +740,8 @@
       cy.style(style);
       cy.layout(layoutOptions).run();
     }
+
+    updateLeafVisibility();
 
     cy.removeListener("tap", "node");
     cy.on("tap", "node", async (event) => {
@@ -749,6 +800,9 @@
     loadNodeTypesForViews();
     if (els.itemSearch.value) {
       scheduleLoadItems();
+    }
+    if (cy && els.autoExpandToggle?.checked) {
+      resetAutoExpandProgress();
     }
   });
 
@@ -882,9 +936,16 @@
   els.layoutSelect?.addEventListener("change", refreshGraphLayout);
   els.animateToggle?.addEventListener("change", refreshGraphLayout);
 
+  els.hideLeavesToggle?.addEventListener("change", () => {
+    updateLeafVisibility();
+  });
+
   els.autoExpandToggle?.addEventListener("change", () => {
     if (els.autoExpandToggle.checked) {
-      queueAutoExpand();
+      resetAutoExpandProgress();
+    } else {
+      autoExpandGeneration++;
+      autoExpandRunning = false;
     }
   });
 
@@ -934,6 +995,7 @@
             type: sel.colId,
             label: sel.text,
             color: sel.color ?? DEFAULT_NODE_COLOR,
+            seed: true,
           },
         });
       });
@@ -962,7 +1024,13 @@
           const targetKey = nodeKey(displayCol, id);
           if (!nodes.has(targetKey)) {
             nodes.set(targetKey, {
-              data: { id: targetKey, type: displayCol, label: text, color },
+              data: {
+                id: targetKey,
+                type: displayCol,
+                label: text,
+                color,
+                seed: false,
+              },
             });
           } else if (!nodes.get(targetKey).data?.color && color) {
             nodes.get(targetKey).data.color = color;
