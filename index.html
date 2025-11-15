@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -11,11 +11,13 @@
   <body>
     <div class="graph-app">
       <div class="wrap">
-        <div id="left-panel-root" data-partial="partials/left-panel.html"></div>
+        <div id="panel-trigger-root" data-partial="partials/top-bar.html"></div>
+
+        <div id="filter-panel-root" class="floating-panel" data-partial="partials/filter-panel.html"></div>
 
         <div id="cy"></div>
 
-        <div id="right-panel-root" data-partial="partials/right-panel.html"></div>
+        <div id="settings-panel-root" class="floating-panel" data-partial="partials/settings-panel.html"></div>
       </div>
 
       <div id="loading-overlay" role="status" aria-live="polite" hidden>

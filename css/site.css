@@ -30,55 +30,106 @@
   position: relative;
   width: 100%;
   min-height: 100vh;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.graph-app #panel-trigger-root{
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+}
+
+.graph-app .panel-trigger-bar{
+  display: flex;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+}
+
+.graph-app[data-theme="dark"] .panel-trigger-bar{
+  background: rgba(17, 24, 39, 0.92);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.graph-app .panel-trigger{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.graph-app .panel-trigger .icon{
+  font-size: 16px;
+}
+
+.graph-app .panel-trigger.active{
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.graph-app[data-theme="dark"] .panel-trigger.active{
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.graph-app #filter-panel-root,
+.graph-app #settings-panel-root{
+  position: absolute;
+  top: 64px;
+  width: var(--panel-width);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-15px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+  z-index: 5;
+}
+
+.graph-app #filter-panel-root{
+  left: 16px;
+}
+
+.graph-app #settings-panel-root{
+  right: 16px;
+}
+
+.graph-app #filter-panel-root.open,
+.graph-app #settings-panel-root.open{
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+html[dir="rtl"] .graph-app #filter-panel-root{
+  left: auto;
+  right: 16px;
+}
+
+html[dir="rtl"] .graph-app #settings-panel-root{
+  right: auto;
+  left: 16px;
 }
 
 .graph-app #cy{
   width: 100%;
-  min-height: 70vh;
+  min-height: 100vh;
   background: #fdfefe;
-  border: 1px solid rgba(0,0,0,0.05);
-  border-radius: 16px;
-  box-shadow: inset 0 0 0 rgba(0,0,0,0.05);
 }
 
 .graph-app[data-theme="dark"] #cy{
   background: #0f1929;
-  border-color: rgba(255,255,255,0.1);
-}
-
-.graph-app .wrap{
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.graph-app #left-panel-root,
-.graph-app #right-panel-root{
-  position: absolute;
-  top: 32px;
-  width: var(--panel-width);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.graph-app #left-panel-root{
-  left: 20px;
-}
-
-.graph-app #right-panel-root{
-  right: 20px;
-}
-
-html[dir="rtl"] .graph-app #left-panel-root{
-  left: auto;
-  right: 20px;
-}
-
-html[dir="rtl"] .graph-app #right-panel-root{
-  right: auto;
-  left: 20px;
 }
 
 .graph-app #cy{
@@ -96,8 +147,8 @@ html[dir="rtl"] .graph-app #right-panel-root{
 }
 
 @media (max-width: 1100px){
-  .graph-app #left-panel-root,
-  .graph-app #right-panel-root{
+  .graph-app #filter-panel-root,
+  .graph-app #settings-panel-root{
     position: static;
     width: 100%;
     pointer-events: auto;
@@ -604,11 +655,19 @@ html[dir="rtl"] .graph-app #right-panel-root{
 }
 
 @media (max-width: 1200px) {
-  .graph-app #left-panel-root, .graph-app #right-panel-root{
+  .graph-app #panel-trigger-root{
+    position: static;
+    transform: none;
+    margin: 0 0 12px;
+  }
+
+  .graph-app #filter-panel-root, .graph-app #settings-panel-root{
     position: static;
     width: 100%;
-    height: auto;
     pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
   }
 
   .graph-app .filter-panel, .graph-app .filter-panel.collapsed{

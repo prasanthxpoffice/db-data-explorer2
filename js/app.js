@@ -263,6 +263,66 @@ function initApp() {
     data.loadViews();
   });
 
+  const floatingPanels = {
+    filters: document.getElementById("filter-panel-root"),
+    settings: document.getElementById("settings-panel-root"),
+  };
+  const floatingButtons = Array.from(
+    document.querySelectorAll(".panel-trigger")
+  );
+  let activeFloatingPanel = null;
+
+  const isCompactLayout = () =>
+    window.matchMedia("(max-width: 1100px)").matches;
+
+  function closeFloatingPanels() {
+    activeFloatingPanel = null;
+    floatingButtons.forEach((btn) => {
+      btn.classList.remove("active");
+      btn.setAttribute("aria-pressed", "false");
+    });
+    Object.values(floatingPanels).forEach((panel) =>
+      panel?.classList.remove("open")
+    );
+  }
+
+  function toggleFloatingPanel(name) {
+    const panel = floatingPanels[name];
+    if (!panel) return;
+
+    if (isCompactLayout()) {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    if (activeFloatingPanel === name) {
+      closeFloatingPanels();
+      return;
+    }
+
+    activeFloatingPanel = name;
+    floatingButtons.forEach((btn) => {
+      const isActive = btn.dataset.panel === name;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+    Object.entries(floatingPanels).forEach(([key, el]) => {
+      el?.classList.toggle("open", key === name);
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest(".panel-trigger");
+    if (trigger) {
+      event.stopPropagation();
+      toggleFloatingPanel(trigger.dataset.panel);
+    }
+  });
+
+  window
+    .matchMedia("(max-width: 1100px)")
+    .addEventListener("change", closeFloatingPanels);
+
   els.viewsToggle?.addEventListener("click", (event) => {
     event.stopPropagation();
     const isOpen = els.viewsDropdown?.classList.contains("open");
@@ -303,6 +363,7 @@ function initApp() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       data.setViewsDropdownOpen(false);
+      closeFloatingPanels();
     }
   });
 
