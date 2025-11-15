@@ -201,6 +201,7 @@ html[dir="rtl"] .graph-app #path-panel-root{
   overflow: visible;
   pointer-events: auto;
   transition: transform 0.25s ease, opacity 0.25s ease;
+  max-height: calc(100vh - 140px);
 }
 
 .graph-app[data-theme="dark"] .filter-panel{
@@ -208,6 +209,13 @@ html[dir="rtl"] .graph-app #path-panel-root{
   border-color: #2c384f;
   color: #f4f6ff;
 }
+.graph-app .settings-panel,
+.graph-app .path-panel{
+  max-height: calc(100vh - 140px);
+  display: flex;
+  flex-direction: column;
+}
+
 .graph-app .info-panel{
   height: auto;
   max-height: calc(100vh - 160px);
@@ -601,6 +609,7 @@ html[dir="rtl"] .graph-app .info-table td{
   gap: 14px;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  min-height: 0;
 }
 
 .panel-body::-webkit-scrollbar{

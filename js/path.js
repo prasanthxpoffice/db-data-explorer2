@@ -198,22 +198,13 @@
     }
 
     function startNodeBlink(nodeId) {
+      stopNodeBlink(nodeId);
       const cy = currentCy();
       if (!cy) return;
       const node = cy.getElementById(nodeId);
-      if (!node || !node.length) return;
-      stopNodeBlink(nodeId);
-      let dim = false;
-      const intervalId = window.setInterval(() => {
-        const current = cy.getElementById(nodeId);
-        if (!current || !current.length) {
-          stopNodeBlink(nodeId);
-          return;
-        }
-        dim = !dim;
-        current.toggleClass("path-node-dim", dim);
-      }, 500);
-      blinkIntervals.set(nodeId, intervalId);
+      if (node && node.length) {
+        node.removeClass("path-node-dim");
+      }
     }
 
     function stopNodeBlink(nodeId) {
