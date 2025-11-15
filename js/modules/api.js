@@ -7,6 +7,7 @@
     els,
     defaults,
     setStatus,
+    translate,
     beginLoading,
     endLoading,
   }) {
@@ -76,10 +77,16 @@
 
     function updateViewIndicator() {
       const label = state.viewIds.length
-        ? `${state.viewIds.length} view(s)`
-        : "Select views";
-      if (els.viewsToggle) {
+        ? `${translate("filtersSelectedPrefix")} ${state.viewIds.length} ${translate(
+            "filtersSelectedSuffix"
+          )}`
+        : translate("filtersSelectViews");
+      if (els.viewsToggleLabel) {
+        els.viewsToggleLabel.textContent = label;
+      } else if (els.viewsToggle) {
         els.viewsToggle.textContent = `${label} v`;
+      }
+      if (els.viewsToggle) {
         els.viewsToggle.setAttribute("aria-label", label);
       }
     }
@@ -100,7 +107,7 @@
             v.ViewDescription ??
             v.viewName ??
             v.ViewName ??
-            `View ${id}`;
+            `${translate("viewPrefix")} ${id}`;
           return `<label><input type="checkbox" value="${rawId}" ${checked} /> ${description}</label>`;
         })
         .filter(Boolean);
@@ -109,7 +116,7 @@
       if (els.viewsOptions) {
         els.viewsOptions.innerHTML = items.length
           ? items.join("")
-          : '<small class="hint">No views available.</small>';
+          : `<small class="hint">${translate("noViews")}</small>`;
       }
       updateViewIndicator();
     }
@@ -141,11 +148,11 @@
 
     async function loadViews() {
       try {
-        setStatus("Loading views…");
+        setStatus(translate("statusLoadingViews"));
         const resp = await callApi("views");
         state.views = unwrapData(resp);
         renderViewsList();
-        setStatus("Views loaded.");
+        setStatus(translate("statusViewsLoaded"));
         await loadNodeTypesForViews();
       } catch (err) {
         setStatus(err.message);
@@ -160,11 +167,11 @@
         return;
       }
       try {
-        setStatus("Loading node types…");
+        setStatus(translate("statusLoadingNodeTypes"));
         const resp = await callApi("nodeTypes", { viewIds: state.viewIds });
         state.nodeTypes = unwrapData(resp);
         renderNodeTypes();
-        setStatus(`Node types: ${state.nodeTypes.length}`);
+        setStatus(`${translate("statusNodeTypes")}: ${state.nodeTypes.length}`);
         if (els.itemSearch?.value) {
           scheduleLoadItems();
         }
@@ -200,7 +207,8 @@
 
       els.itemSuggestions.innerHTML = list
         .map((item, index) => {
-          const text = item.text ?? item.Text ?? "(no text)";
+          const text =
+            item.text ?? item.Text ?? translate("noText");
           const active =
             state.activeItem &&
             state.activeItem.id === `${item.id ?? item.Id ?? ""}`
@@ -240,7 +248,7 @@
         return;
       }
       try {
-        setStatus("Loading items…");
+        setStatus(translate("statusLoadingItems"));
         const resp = await callApi("items", {
           viewIds: state.viewIds,
           colId,
@@ -248,7 +256,7 @@
         });
         state.items = unwrapData(resp);
         renderItems();
-        setStatus(`Items loaded: ${state.items.length}`);
+        setStatus(`${translate("statusItemsLoaded")}: ${state.items.length}`);
       } catch (err) {
         setStatus(err.message);
       }

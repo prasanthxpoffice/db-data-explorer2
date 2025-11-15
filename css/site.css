@@ -308,50 +308,6 @@ html[dir="rtl"] .graph-app #info-panel-root{
 html[dir="rtl"] .graph-app .info-table-compact th{
   width: 40%;
 }
-.graph-app .info-list{
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.graph-app .info-meta-list{
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.graph-app .info-meta-list li{
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px dashed rgba(15, 23, 42, 0.15);
-  padding-bottom: 4px;
-}
-
-.graph-app[data-theme="dark"] .info-meta-list li{
-  border-color: rgba(148, 163, 184, 0.4);
-}
-
-.graph-app .info-meta-list strong{
-  font-size: 13px;
-  color: inherit;
-  flex: 0 0 40%;
-}
-
-.graph-app .info-meta-list span{
-  font-size: 13px;
-  color: inherit;
-  flex: 1;
-  text-align: right;
-  word-break: break-word;
-}
-
 .graph-app .info-table-container{
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 12px;

@@ -8,6 +8,7 @@
     dateDefaults,
     DEFAULT_NODE_COLOR,
     setStatus,
+    translate,
     callApi,
     unwrapData,
     getMaxNodes,
@@ -237,7 +238,7 @@
       if (!cy) return;
       autoExpandRunning = true;
       try {
-        setStatus("Auto expanding nodes...");
+        setStatus(translate("statusAutoExpanding"));
         while (
           cy &&
           token === autoExpandGeneration &&
@@ -252,7 +253,7 @@
           await appendExpansionResults(nextNode.id());
         }
         if (token === autoExpandGeneration) {
-          setStatus("Auto expand complete.");
+          setStatus(translate("statusAutoExpandComplete"));
         }
       } catch (err) {
         if (token === autoExpandGeneration) {
@@ -475,11 +476,11 @@
         if (els.stopExpandToggle && els.stopExpandToggle.checked) {
           return;
         }
-        setStatus("Expanding node...");
+        setStatus(translate("statusExpandingNode"));
         try {
           await appendExpansionResults(tapped.id(), { force: true });
           queueAutoExpand();
-          setStatus("Node expanded.");
+          setStatus(translate("statusNodeExpanded"));
         } catch (err) {
           setStatus(err.message);
         }

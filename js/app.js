@@ -38,6 +38,16 @@ function initApp() {
     activeItem: null,
     theme: defaults.theme,
   };
+  const translations = window.TRANSLATIONS || {};
+  const translate = (key, fallback) => {
+    const lang = state.language;
+    return (
+      translations[lang]?.[key] ??
+      translations.en?.[key] ??
+      fallback ??
+      key
+    );
+  };
 
   const getEntityLabel = (colId) => {
     const key = (colId || "").toLowerCase();
@@ -74,6 +84,7 @@ function initApp() {
     configPanel: document.getElementById("configPanel"),
     toggleConfig: document.getElementById("toggleConfig"),
     configChevron: document.getElementById("configChevron"),
+    viewsToggleLabel: document.getElementById("viewsToggleLabel"),
     layoutSelect: document.getElementById("layoutSelect"),
     animateToggle: document.getElementById("animateToggle"),
     stopExpandToggle: document.getElementById("stopExpandToggle"),
@@ -104,7 +115,7 @@ function initApp() {
     infoPanelEls.hydrated = !!infoPanelEls.content;
     return infoPanelEls.hydrated;
   }
-  const defaultInfoHtml = "<p>Select a node or edge to view details.</p>";
+  const defaultInfoHtml = () => `<p>${translate("infoPrompt")}</p>`;
   const escapeHtml = (val = "") =>
     String(val)
       .replace(/&/g, "&amp;")
@@ -177,13 +188,40 @@ function initApp() {
     }
   };
 
+  function applyDomTranslations() {
+    document
+      .querySelectorAll("[data-i18n]")
+      .forEach((el) => {
+        const key = el.dataset.i18n;
+        if (key) {
+          el.textContent = translate(key, el.textContent);
+        }
+      });
+    document
+      .querySelectorAll("[data-i18n-placeholder]")
+      .forEach((el) => {
+        const key = el.dataset.i18nPlaceholder;
+        if (key) {
+          el.placeholder = translate(key, el.placeholder);
+        }
+      });
+    document
+      .querySelectorAll("[data-i18n-aria-label]")
+      .forEach((el) => {
+        const key = el.dataset.i18nAriaLabel;
+        if (key) {
+          el.setAttribute("aria-label", translate(key, el.getAttribute("aria-label")));
+        }
+      });
+  }
+
   function resetInfoPanel() {
     if (!infoPanelEls.hydrated) {
       hydrateInfoPanel();
     }
     const content = infoPanelEls.content;
     if (content) {
-      content.innerHTML = defaultInfoHtml;
+      content.innerHTML = defaultInfoHtml();
     }
   }
 
@@ -202,14 +240,16 @@ function initApp() {
               neighborColor
             )}"></span>`;
             const rows = [
-              { label: "Direction", value: arrowSymbol },
-              { label: "Color", value: neighborColorChip },
+              { label: translate("direction"), value: arrowSymbol },
+              { label: translate("color"), value: neighborColorChip },
               {
-                label: "Description",
-                value: escapeHtml(neighbor.label || "(unnamed)"),
+                label: translate("description"),
+                value: escapeHtml(
+                  neighbor.label || translate("unnamed")
+                ),
               },
               {
-                label: "Entity",
+                label: translate("entity"),
                 value: escapeHtml(
                   neighbor.entityLabel ||
                     neighbor.entity ||
@@ -218,16 +258,16 @@ function initApp() {
                 ),
               },
               {
-                label: "Code",
+                label: translate("code"),
                 value: escapeHtml(neighbor.type || "-"),
               },
               {
-                label: "Ref No.",
+                label: translate("refNo"),
                 value: escapeHtml(neighbor.id || "-"),
               },
               {
-                label: "Relation",
-                value: escapeHtml(conn.edgeLabel || "(no label)"),
+                label: translate("relation"),
+                value: escapeHtml(conn.edgeLabel || translate("noLabel")),
               },
             ];
             const table = `<table class="info-table info-table-compact">${rows
@@ -239,7 +279,7 @@ function initApp() {
             return `<div class="connection-card">${table}</div>`;
           })
           .join("")}</div>`
-      : "<p>No connected nodes yet.</p>";
+      : `<p>${translate("noConnections")}</p>`;
 
     const meta = data.meta || {};
     const colorValue =
@@ -255,7 +295,7 @@ function initApp() {
     const description =
       pickMetaValue(meta, "text", "description", "nodeText") ||
       data.label ||
-      "(node)";
+      translate("nodeFallback");
     const dateValue = normalizeDateValue(
       pickMetaValue(meta, "nodeDate", "date")
     );
@@ -267,16 +307,19 @@ function initApp() {
       "-";
 
     const detailRows = [
-      { label: "Color", value: `${colorSwatch}` },
-      { label: "Entity", value: escapeHtml(entity) },
-      { label: "Description", value: escapeHtml(description) },
+      { label: translate("color"), value: `${colorSwatch}` },
+      { label: translate("entity"), value: escapeHtml(entity) },
+      {
+        label: translate("description"),
+        value: escapeHtml(description || translate("nodeFallback")),
+      },
     ];
     if (dateValue) {
-      detailRows.push({ label: "Date", value: escapeHtml(dateValue) });
+      detailRows.push({ label: translate("date"), value: escapeHtml(dateValue) });
     }
     detailRows.push(
-      { label: "Code", value: escapeHtml(code) },
-      { label: "Ref No.", value: escapeHtml(refNo) }
+      { label: translate("code"), value: escapeHtml(code) },
+      { label: translate("refNo"), value: escapeHtml(refNo) }
     );
 
     const detailTable = `<div class="info-table-container"><table class="info-table">${detailRows
@@ -288,7 +331,7 @@ function initApp() {
         ${detailTable}
       </div>
       <div class="info-block">
-        <h4>Connected nodes (${connections.length})</h4>
+        <h4>${translate("connectedNodes")} (${connections.length})</h4>
         ${connectionItems}
       </div>
     `;
@@ -298,19 +341,16 @@ function initApp() {
     if (!infoPanelEls.hydrated && !hydrateInfoPanel()) return;
     const content = infoPanelEls.content;
     if (!data || !content) return;
-    const directionText = `${directionSymbol(data.direction)}`;
-    const formatNodeRef = (node) => {
-      if (!node) return "-";
-      const desc = node.label || "(node)";
-      const code = node.type || "-";
-      const ref = node.id || "-";
-      return `${escapeHtml(desc)}<br/><small>Code: ${escapeHtml(
-        code
-      )} · Ref No.: ${escapeHtml(ref)}</small>`;
-    };
+    const directionValue = data.direction || translate("directionNone");
+    const directionText = `${directionSymbol(data.direction)} ${escapeHtml(
+      directionValue
+    )}`;
     const tableRows = [
-      { label: "Direction", value: directionText },
-      { label: "Description", value: escapeHtml(data.label || "(no label)") },
+      { label: translate("direction"), value: directionText },
+      {
+        label: translate("edgeLabel"),
+        value: escapeHtml(data.label || translate("noLabel")),
+      },
     ];
     const detailTable = `<div class="info-table-container"><table class="info-table">${tableRows
       .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
@@ -324,15 +364,18 @@ function initApp() {
       const entity =
         node.entityLabel || getEntityLabel(node.type) || node.type || "-";
       const rows = [
-        { label: "Color", value: colorChip },
-        { label: "Description", value: escapeHtml(node.label || "(node)") },
-        { label: "Entity", value: escapeHtml(entity) },
+        { label: translate("color"), value: colorChip },
         {
-          label: "Code",
+          label: translate("description"),
+          value: escapeHtml(node.label || translate("nodeFallback")),
+        },
+        { label: translate("entity"), value: escapeHtml(entity) },
+        {
+          label: translate("code"),
           value: escapeHtml(node.type || "-"),
         },
         {
-          label: "Ref No.",
+          label: translate("refNo"),
           value: escapeHtml(node.id || "-"),
         },
       ];
@@ -353,8 +396,8 @@ function initApp() {
       </div>
       <div class="info-block">
         <div class="connections-grid">
-          ${cardMarkup("Source node", data.source)}
-          ${cardMarkup("Target node", data.target)}
+          ${cardMarkup(translate("sourceNode"), data.source)}
+          ${cardMarkup(translate("targetNode"), data.target)}
         </div>
       </div>
     `;
@@ -404,6 +447,7 @@ function initApp() {
     els,
     defaults,
     setStatus,
+    translate,
     beginLoading: loadingTracker.beginLoading,
     endLoading: loadingTracker.endLoading,
   });
@@ -414,6 +458,7 @@ function initApp() {
     dateDefaults,
     DEFAULT_NODE_COLOR,
     setStatus,
+    translate,
     callApi: data.callApi,
     unwrapData: data.unwrapData,
     getMaxNodes,
@@ -432,9 +477,13 @@ function initApp() {
   function applyLanguageChrome() {
     document.documentElement.lang = state.language;
     document.documentElement.dir = dirFor(state.language);
+    document.body.style.textAlign = alignFor(state.language);
     if (els.language) {
       els.language.value = state.language;
     }
+    applyDomTranslations();
+    data.updateViewIndicator();
+    renderSelections();
   }
 
   let filtersCollapsed = false;
@@ -507,8 +556,8 @@ function initApp() {
           <span class="pill">${s.id}</span>
         </div>
         <div class="row" style="margin-top:6px">
-          <span>From: ${s.fromDate || "Any"}</span>
-          <span>To: ${s.toDate || "Any"}</span>
+          <span>${translate("fromLabel")}: ${s.fromDate || translate("anyValue")}</span>
+          <span>${translate("toLabel")}: ${s.toDate || translate("anyValue")}</span>
           <button data-i="${i}" class="rm danger remove-pill" aria-label="Remove">&times;</button>
         </div>
       </li>
@@ -552,6 +601,7 @@ function initApp() {
     applyLanguageChrome();
     data.clearItems(true);
     data.loadViews();
+    resetInfoPanel();
   });
 
   const isCompactLayout = () =>
@@ -703,12 +753,12 @@ function initApp() {
     const colLabel =
       els.nodeType?.options[els.nodeType.selectedIndex]?.textContent ?? colId;
     if (!colId) {
-      setStatus("Pick an entity first.");
+    setStatus(translate("statusPickEntity"));
       return;
     }
 
     if (!state.activeItem) {
-      setStatus("Choose an item from the suggestions.");
+    setStatus(translate("statusChooseItem"));
       return;
     }
 
@@ -717,7 +767,7 @@ function initApp() {
     );
 
     if (duplicate) {
-      setStatus("This item is already in the list.");
+    setStatus(translate("statusDuplicateItem"));
       return;
     }
 
@@ -746,7 +796,7 @@ function initApp() {
     state.selected = [];
     renderSelections();
     setGraphReadyState(false);
-    setStatus("Graph cleared.");
+    setStatus(translate("statusGraphCleared"));
   });
 
   const refreshGraphLayout = () => {
@@ -784,15 +834,15 @@ function initApp() {
   els.showGraph?.addEventListener("click", async () => {
     try {
       if (!state.selected.length) {
-        setStatus("Add at least one selection.");
+        setStatus(translate("statusNeedSelection"));
         return;
       }
       if (!state.viewIds.length) {
-        setStatus("Select views first.");
+        setStatus(translate("statusNeedViews"));
         return;
       }
 
-      setStatus("Building graph…");
+      setStatus(translate("statusBuildingGraph"));
       graph.resetAutoExpandProgress();
 
       const nodes = new Map();
@@ -922,7 +972,11 @@ function initApp() {
 
       graph.renderGraph(Array.from(nodes.values()), Array.from(edges.values()));
       setGraphReadyState(true);
-      setStatus(`Graph ready. Nodes: ${nodes.size}, Edges: ${edges.size}`);
+      setStatus(
+        `${translate("statusGraphReady")} ${translate("statusNodes")}: ${
+          nodes.size
+        }, ${translate("statusEdges")}: ${edges.size}`
+      );
       graph.queueAutoExpand();
     } catch (err) {
       setStatus(err.message);

@@ -1,36 +1,37 @@
 <div class="filter-panel right-panel" id="configPanel">
   <div class="panel-toggle" id="toggleConfig">
-    <h3>Graph Settings</h3>
+    <h3 data-i18n="settingsTitle">Graph Settings</h3>
     <button
       type="button"
       id="configChevron"
       class="chevron-btn"
       aria-label="Toggle settings"
+      data-i18n-aria-label="toggleSettingsAria"
     >
       v
     </button>
   </div>
   <div class="panel-body">
     <div class="panel-section">
-      <label for="themeSelect">Theme</label>
+      <label for="themeSelect" data-i18n="themeLabel">Theme</label>
       <select id="themeSelect">
-        <option value="light" selected>Light</option>
-        <option value="dark">Dark</option>
+        <option value="light" selected data-i18n="themeLight">Light</option>
+        <option value="dark" data-i18n="themeDark">Dark</option>
       </select>
     </div>
     <div class="panel-section">
-      <label for="autoExpandToggle">Auto expand nodes</label>
+      <label for="autoExpandToggle" data-i18n="autoExpandLabel">Auto expand nodes</label>
       <label class="switch">
         <input type="checkbox" id="autoExpandToggle" />
         <span class="slider"></span>
       </label>
     </div>
     <div class="panel-section">
-      <label for="maxNodes">Max nodes</label>
+      <label for="maxNodes" data-i18n="maxNodesLabel">Max nodes</label>
       <input id="maxNodes" type="number" min="10" value="200" />
     </div>
     <div class="panel-section graph-only">
-      <label for="layoutSelect">Layout</label>
+      <label for="layoutSelect" data-i18n="layoutLabel">Layout</label>
       <select id="layoutSelect">
         <option value="cose" selected>COSE</option>
         <option value="breadthfirst">Breadthfirst</option>
@@ -40,29 +41,29 @@
       </select>
     </div>
     <div class="panel-section graph-only">
-      <label for="animateToggle">Animate layout</label>
+      <label for="animateToggle" data-i18n="animateLayoutLabel">Animate layout</label>
       <label class="switch">
         <input type="checkbox" id="animateToggle" checked />
         <span class="slider"></span>
       </label>
     </div>
     <div class="panel-section switch-group graph-only">
-      <label for="stopExpandToggle">Stop node expand</label>
+      <label for="stopExpandToggle" data-i18n="stopExpandLabel">Stop node expand</label>
       <label class="switch">
         <input type="checkbox" id="stopExpandToggle" />
         <span class="slider"></span>
       </label>
-      <label for="hideLeavesToggle">Hide leaves</label>
+      <label for="hideLeavesToggle" data-i18n="hideLeavesLabel">Hide leaves</label>
       <label class="switch">
         <input type="checkbox" id="hideLeavesToggle" />
         <span class="slider"></span>
       </label>
     </div>
     <div class="panel-section graph-only">
-      <button id="exportPng" class="secondary">Export PNG</button>
+      <button id="exportPng" class="secondary" data-i18n="exportPng">Export PNG</button>
     </div>
     <div class="panel-section">
-      <label for="language">Language</label>
+      <label for="language" data-i18n="languageLabel">Language</label>
       <select id="language">
         <option value="en" selected>English</option>
         <option value="ar">العربية</option>
