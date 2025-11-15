@@ -11,11 +11,24 @@
     callApi,
     unwrapData,
     getMaxNodes,
+    onNodeSelected,
+    onEdgeSelected,
+    onGraphCleared,
   }) {
     let cy = null;
     const expandedNodes = new Set();
     let autoExpandRunning = false;
     let autoExpandGeneration = 0;
+
+    function getEntityLabel(colId) {
+      const key = (colId || "").toLowerCase();
+      if (!key) return colId;
+      const match = state.nodeTypes.find((nt) => {
+        const id = (nt.colId || nt.ColId || "").toLowerCase();
+        return id === key;
+      });
+      return match ? match.label || match.Label || match.colId || colId : colId;
+    }
 
     function deriveArrows(directionRaw) {
       const direction = (directionRaw || "").trim();
@@ -77,6 +90,9 @@
       expandedNodes.clear();
       autoExpandRunning = false;
       autoExpandGeneration = 0;
+      if (onGraphCleared) {
+        onGraphCleared();
+      }
     }
 
     function resetAutoExpandProgress() {
@@ -125,6 +141,7 @@
         const color = row.color ?? row.Color ?? DEFAULT_NODE_COLOR;
         const { sourceArrow, targetArrow } = deriveArrows(direction);
 
+        const entityLabel = getEntityLabel(displayCol);
         const targetKey = `${displayCol}:${id}`;
 
         const existingNode = cy.getElementById(targetKey);
@@ -132,14 +149,26 @@
           if (!existingNode.data("color") && color) {
             existingNode.data("color", color);
           }
+          if (!existingNode.data("entityLabel")) {
+            existingNode.data("entityLabel", entityLabel);
+          }
+          if (!existingNode.data("meta")) {
+            existingNode.data("meta", { ...row, entityLabel });
+          } else if (!existingNode.data("meta").entityLabel) {
+            const updatedMeta = existingNode.data("meta");
+            updatedMeta.entityLabel = entityLabel;
+            existingNode.data("meta", updatedMeta);
+          }
         } else {
           nodesToAdd.push({
             data: {
               id: targetKey,
               type: displayCol,
               label: text,
+              entityLabel,
               color,
               seed: false,
+              meta: { ...row, entityLabel },
             },
           });
         }
@@ -162,6 +191,13 @@
           if (!edgeEle.data("label") && label) {
             edgeEle.data("label", label);
           }
+          if (!edgeEle.data("meta")) {
+            edgeEle.data("meta", {
+              ...row,
+              sourceColId: colId,
+              sourceId: nodeId,
+            });
+          }
         } else {
           edgesToAdd.push({
             data: {
@@ -172,6 +208,11 @@
               direction,
               sourceArrow,
               targetArrow,
+              meta: {
+                ...row,
+                sourceColId: colId,
+                sourceId: nodeId,
+              },
             },
           });
         }
@@ -238,6 +279,91 @@
       }
 
       autoExpandPendingNodes(autoExpandGeneration);
+    }
+
+    function buildNodeInfoPayload(node) {
+      if (!node) return null;
+      const [type = "", rawId = ""] = (node.id() || "").split(":");
+      const nodeMeta = node.data("meta") || {};
+      const entityLabel =
+        node.data("entityLabel") ||
+        nodeMeta.entityLabel ||
+        getEntityLabel(type);
+      const connections = node
+        .connectedEdges()
+        .toArray()
+        .map((edge) => {
+          const source = edge.source();
+          const target = edge.target();
+          if (!source || !target) return null;
+          const isSource = source.id() === node.id();
+          const neighbor = isSource ? target : source;
+          if (!neighbor || !neighbor.id()) return null;
+          const [neighborType = "", neighborRawId = ""] = (
+            neighbor.id() || ""
+          ).split(":");
+          const neighborMeta = neighbor.data("meta") || {};
+          const entityLabelNeighbor =
+            neighbor.data("entityLabel") ||
+            neighborMeta.entityLabel ||
+            getEntityLabel(neighborType);
+          return {
+            edgeId: edge.id(),
+            edgeLabel: edge.data("label") || "",
+            direction: edge.data("direction") || "",
+            orientation: isSource ? "outgoing" : "incoming",
+            neighbor: {
+              key: neighbor.id(),
+              type: neighborType,
+              id: neighborRawId || neighbor.id(),
+              label: neighbor.data("label") || "",
+               entityLabel: entityLabelNeighbor,
+              color: neighbor.data("color") || DEFAULT_NODE_COLOR,
+            },
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        key: node.id(),
+        type,
+        id: rawId || node.id(),
+        label: node.data("label") || "",
+        color: node.data("color") || DEFAULT_NODE_COLOR,
+        entityLabel,
+        seed: !!node.data("seed"),
+        meta: node.data("meta") || null,
+        connections,
+      };
+    }
+
+    function buildEdgeInfoPayload(edge) {
+      if (!edge) return null;
+      const edgeData = edge.data() || {};
+      const source = edge.source();
+      const target = edge.target();
+      if (!source || !target) return null;
+      const [sourceType = "", sourceRawId = ""] = (source.id() || "").split(
+        ":"
+      );
+      const [targetType = "", targetRawId = ""] = (target.id() || "").split(
+        ":"
+      );
+      const mapNode = (node, type, rawId) => ({
+        key: node.id(),
+        type,
+        id: rawId || node.id(),
+        label: node.data("label") || "",
+        color: node.data("color") || DEFAULT_NODE_COLOR,
+      });
+      return {
+        id: edgeData.id || edge.id(),
+        label: edgeData.label || "",
+        direction: edgeData.direction || "",
+        source: mapNode(source, sourceType, sourceRawId),
+        target: mapNode(target, targetType, targetRawId),
+        meta: edge.data("meta") || null,
+      };
     }
 
     function buildStyle() {
@@ -335,11 +461,20 @@
 
       cy.removeListener("tap", "node");
       cy.on("tap", "node", async (event) => {
+        const tapped = event.target;
+        if (!tapped || !tapped.id()) return;
+        let nodePayload = null;
+        try {
+          nodePayload = buildNodeInfoPayload(tapped);
+        } catch (err) {
+          console.error("Failed to build node info", err);
+        }
+        if (nodePayload && onNodeSelected) {
+          onNodeSelected(nodePayload);
+        }
         if (els.stopExpandToggle && els.stopExpandToggle.checked) {
           return;
         }
-        const tapped = event.target;
-        if (!tapped || !tapped.id()) return;
         setStatus("Expanding node...");
         try {
           await appendExpansionResults(tapped.id(), { force: true });
@@ -347,6 +482,21 @@
           setStatus("Node expanded.");
         } catch (err) {
           setStatus(err.message);
+        }
+      });
+
+      cy.removeListener("tap", "edge");
+      cy.on("tap", "edge", (event) => {
+        const tappedEdge = event.target;
+        if (!tappedEdge) return;
+        let edgePayload = null;
+        try {
+          edgePayload = buildEdgeInfoPayload(tappedEdge);
+        } catch (err) {
+          console.error("Failed to build edge info", err);
+        }
+        if (edgePayload && onEdgeSelected) {
+          onEdgeSelected(edgePayload);
         }
       });
 

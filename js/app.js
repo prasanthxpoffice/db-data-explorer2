@@ -39,6 +39,16 @@ function initApp() {
     theme: defaults.theme,
   };
 
+  const getEntityLabel = (colId) => {
+    const key = (colId || "").toLowerCase();
+    if (!key) return colId;
+    const match = state.nodeTypes.find((nt) => {
+      const id = (nt.colId || nt.ColId || "").toLowerCase();
+      return id === key;
+    });
+    return match ? match.label || match.Label || match.colId || colId : colId;
+  };
+
   const rootEl = document.querySelector(".graph-app") || document.body;
 
   const els = {
@@ -74,6 +84,284 @@ function initApp() {
     loadingOverlay: document.getElementById("loading-overlay"),
     root: rootEl,
   };
+
+  const floatingPanels = {
+    filters: document.getElementById("filter-panel-root"),
+    settings: document.getElementById("settings-panel-root"),
+    info: document.getElementById("info-panel-root"),
+  };
+  const floatingButtons = Array.from(
+    document.querySelectorAll(".panel-trigger")
+  );
+  let activeFloatingPanel = null;
+
+  const infoPanelEls = {
+    content: null,
+    hydrated: false,
+  };
+  function hydrateInfoPanel() {
+    infoPanelEls.content = document.getElementById("infoContent");
+    infoPanelEls.hydrated = !!infoPanelEls.content;
+    return infoPanelEls.hydrated;
+  }
+  const defaultInfoHtml = "<p>Select a node or edge to view details.</p>";
+  const escapeHtml = (val = "") =>
+    String(val)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
+
+  const pickMetaValue = (meta, ...keys) => {
+    if (!meta) return undefined;
+    for (const key of keys) {
+      if (key in meta && meta[key] !== undefined && meta[key] !== null) {
+        return meta[key];
+      }
+      const lower =
+        typeof key === "string"
+          ? key.charAt(0).toLowerCase() + key.slice(1)
+          : key;
+      if (
+        typeof lower === "string" &&
+        lower in meta &&
+        meta[lower] !== undefined &&
+        meta[lower] !== null
+      ) {
+        return meta[lower];
+      }
+      const upper =
+        typeof key === "string"
+          ? key.charAt(0).toUpperCase() + key.slice(1)
+          : key;
+      if (
+        typeof upper === "string" &&
+        upper in meta &&
+        meta[upper] !== undefined &&
+        meta[upper] !== null
+      ) {
+        return meta[upper];
+      }
+    }
+    return undefined;
+  };
+
+  const normalizeDateValue = (value) => {
+    if (!value) return null;
+    let str = value;
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      str = value.toISOString().slice(0, 10);
+    } else {
+      str = String(value).slice(0, 10);
+    }
+    if (DEFAULT_DATE_SENTINELS.has(str)) return null;
+    return str;
+  };
+
+  const directionSymbol = (directionRaw) => {
+    const dir = (directionRaw || "").trim();
+    switch (dir) {
+      case "->":
+      case "outgoing":
+        return "&rarr;";
+      case "<-":
+      case "incoming":
+        return "&larr;";
+      case "<->":
+      case "both":
+        return "&harr;";
+      default:
+        return "&rarr;";
+    }
+  };
+
+  function resetInfoPanel() {
+    if (!infoPanelEls.hydrated) {
+      hydrateInfoPanel();
+    }
+    const content = infoPanelEls.content;
+    if (content) {
+      content.innerHTML = defaultInfoHtml;
+    }
+  }
+
+  function renderNodeInfo(data) {
+    if (!infoPanelEls.hydrated && !hydrateInfoPanel()) return;
+    const content = infoPanelEls.content;
+    if (!data || !content) return;
+    const connections = Array.isArray(data.connections) ? data.connections : [];
+    const connectionItems = connections.length
+      ? `<div class="connections-grid">${connections
+          .map((conn) => {
+            const neighbor = conn.neighbor || {};
+            const arrowSymbol = directionSymbol(conn.orientation);
+            const neighborColor = neighbor.color || DEFAULT_NODE_COLOR;
+            const neighborColorChip = `<span class="color-chip" style="background:${escapeHtml(
+              neighborColor
+            )}"></span>`;
+            const rows = [
+              { label: "Direction", value: arrowSymbol },
+              { label: "Color", value: neighborColorChip },
+              {
+                label: "Description",
+                value: escapeHtml(neighbor.label || "(unnamed)"),
+              },
+              {
+                label: "Entity",
+                value: escapeHtml(
+                  neighbor.entityLabel ||
+                    neighbor.entity ||
+                    getEntityLabel(neighbor.type) ||
+                    "-"
+                ),
+              },
+              {
+                label: "Code",
+                value: escapeHtml(neighbor.type || "-"),
+              },
+              {
+                label: "Ref No.",
+                value: escapeHtml(neighbor.id || "-"),
+              },
+              {
+                label: "Relation",
+                value: escapeHtml(conn.edgeLabel || "(no label)"),
+              },
+            ];
+            const table = `<table class="info-table info-table-compact">${rows
+              .map(
+                (row) =>
+                  `<tr><th>${row.label}</th><td>${row.value}</td></tr>`
+              )
+              .join("")}</table>`;
+            return `<div class="connection-card">${table}</div>`;
+          })
+          .join("")}</div>`
+      : "<p>No connected nodes yet.</p>";
+
+    const meta = data.meta || {};
+    const colorValue =
+      data.color || meta.color || data.dataColor || DEFAULT_NODE_COLOR;
+    const colorSwatch = `<span class="color-chip" style="background:${escapeHtml(
+      colorValue
+    )}"></span>`;
+    const entity =
+      pickMetaValue(meta, "nodeTypeLabel", "entityLabel", "entity", "Entity") ||
+      data.entityLabel ||
+      getEntityLabel(data.type) ||
+      "-";
+    const description =
+      pickMetaValue(meta, "text", "description", "nodeText") ||
+      data.label ||
+      "(node)";
+    const dateValue = normalizeDateValue(
+      pickMetaValue(meta, "nodeDate", "date")
+    );
+    const code =
+      pickMetaValue(meta, "displayCol", "code", "columnId") || data.type || "-";
+    const refNo =
+      pickMetaValue(meta, "id", "refNumber", "refNo", "nodeId") ||
+      data.id ||
+      "-";
+
+    const detailRows = [
+      { label: "Color", value: `${colorSwatch}` },
+      { label: "Entity", value: escapeHtml(entity) },
+      { label: "Description", value: escapeHtml(description) },
+    ];
+    if (dateValue) {
+      detailRows.push({ label: "Date", value: escapeHtml(dateValue) });
+    }
+    detailRows.push(
+      { label: "Code", value: escapeHtml(code) },
+      { label: "Ref No.", value: escapeHtml(refNo) }
+    );
+
+    const detailTable = `<div class="info-table-container"><table class="info-table">${detailRows
+      .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
+      .join("")}</table></div>`;
+
+    content.innerHTML = `
+      <div class="info-block info-block-table">
+        ${detailTable}
+      </div>
+      <div class="info-block">
+        <h4>Connected nodes (${connections.length})</h4>
+        ${connectionItems}
+      </div>
+    `;
+  }
+
+  function renderEdgeInfo(data) {
+    if (!infoPanelEls.hydrated && !hydrateInfoPanel()) return;
+    const content = infoPanelEls.content;
+    if (!data || !content) return;
+    const directionText = `${directionSymbol(data.direction)}`;
+    const formatNodeRef = (node) => {
+      if (!node) return "-";
+      const desc = node.label || "(node)";
+      const code = node.type || "-";
+      const ref = node.id || "-";
+      return `${escapeHtml(desc)}<br/><small>Code: ${escapeHtml(
+        code
+      )} · Ref No.: ${escapeHtml(ref)}</small>`;
+    };
+    const tableRows = [
+      { label: "Direction", value: directionText },
+      { label: "Description", value: escapeHtml(data.label || "(no label)") },
+    ];
+    const detailTable = `<div class="info-table-container"><table class="info-table">${tableRows
+      .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
+      .join("")}</table></div>`;
+    const cardMarkup = (title, node) => {
+      if (!node) return "";
+      const color = node.color || DEFAULT_NODE_COLOR;
+      const colorChip = `<span class="color-chip" style="background:${escapeHtml(
+        color
+      )}"></span>`;
+      const entity =
+        node.entityLabel || getEntityLabel(node.type) || node.type || "-";
+      const rows = [
+        { label: "Color", value: colorChip },
+        { label: "Description", value: escapeHtml(node.label || "(node)") },
+        { label: "Entity", value: escapeHtml(entity) },
+        {
+          label: "Code",
+          value: escapeHtml(node.type || "-"),
+        },
+        {
+          label: "Ref No.",
+          value: escapeHtml(node.id || "-"),
+        },
+      ];
+      const table = `<table class="info-table info-table-compact">${rows
+        .map(
+          (row) =>
+            `<tr><th>${row.label}</th><td>${row.value}</td></tr>`
+        )
+        .join("")}</table>`;
+      return `<div class="connection-card">
+        <div class="connection-card-title">${escapeHtml(title)}</div>
+        ${table}
+      </div>`;
+    };
+    content.innerHTML = `
+      <div class="info-block info-block-table">
+        ${detailTable}
+      </div>
+      <div class="info-block">
+        <div class="connections-grid">
+          ${cardMarkup("Source node", data.source)}
+          ${cardMarkup("Target node", data.target)}
+        </div>
+      </div>
+    `;
+  }
+
+  hydrateInfoPanel();
+  resetInfoPanel();
 
   const setStatus = (msg) => {
     if (els.status) {
@@ -129,6 +417,9 @@ function initApp() {
     callApi: data.callApi,
     unwrapData: data.unwrapData,
     getMaxNodes,
+    onNodeSelected: renderNodeInfo,
+    onEdgeSelected: renderEdgeInfo,
+    onGraphCleared: resetInfoPanel,
   });
 
   function dirFor(lang) {
@@ -263,27 +554,32 @@ function initApp() {
     data.loadViews();
   });
 
-  const floatingPanels = {
-    filters: document.getElementById("filter-panel-root"),
-    settings: document.getElementById("settings-panel-root"),
-  };
-  const floatingButtons = Array.from(
-    document.querySelectorAll(".panel-trigger")
-  );
-  let activeFloatingPanel = null;
-
   const isCompactLayout = () =>
     window.matchMedia("(max-width: 1100px)").matches;
 
-  function closeFloatingPanels() {
-    activeFloatingPanel = null;
+  function applyPanelState() {
     floatingButtons.forEach((btn) => {
-      btn.classList.remove("active");
-      btn.setAttribute("aria-pressed", "false");
+      const isActive = activeFloatingPanel === btn.dataset.panel;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
-    Object.values(floatingPanels).forEach((panel) =>
-      panel?.classList.remove("open")
-    );
+    Object.entries(floatingPanels).forEach(([key, panel]) => {
+      if (!panel) return;
+      panel.classList.toggle("open", activeFloatingPanel === key);
+    });
+  }
+
+  function setActivePanel(name) {
+    if (name === "info" && !infoPanelEls.hydrated) {
+      hydrateInfoPanel();
+      if (!infoPanelEls.hydrated) return;
+    }
+    activeFloatingPanel = name;
+    applyPanelState();
+  }
+
+  function closeFloatingPanels() {
+    setActivePanel(null);
   }
 
   function toggleFloatingPanel(name) {
@@ -297,19 +593,12 @@ function initApp() {
 
     if (activeFloatingPanel === name) {
       closeFloatingPanels();
-      return;
+    } else {
+      setActivePanel(name);
     }
-
-    activeFloatingPanel = name;
-    floatingButtons.forEach((btn) => {
-      const isActive = btn.dataset.panel === name;
-      btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-    });
-    Object.entries(floatingPanels).forEach(([key, el]) => {
-      el?.classList.toggle("open", key === name);
-    });
   }
+
+  applyPanelState();
 
   document.addEventListener("click", (event) => {
     const trigger = event.target.closest(".panel-trigger");
@@ -424,8 +713,7 @@ function initApp() {
     }
 
     const duplicate = state.selected.some(
-      (entry) =>
-        entry.colId === colId && entry.id === state.activeItem?.id
+      (entry) => entry.colId === colId && entry.id === state.activeItem?.id
     );
 
     if (duplicate) {
@@ -515,13 +803,27 @@ function initApp() {
 
       state.selected.forEach((sel) => {
         const key = nodeKey(sel.colId, sel.id);
+        const fromDate = sel.resolvedFromDate || sel.fromDate || "Any";
+        const toDate = sel.resolvedToDate || sel.toDate || "Any";
+        const entityLabel = getEntityLabel(sel.colId);
         nodes.set(key, {
           data: {
             id: key,
             type: sel.colId,
             label: sel.text,
+            entityLabel,
             color: sel.color ?? DEFAULT_NODE_COLOR,
             seed: true,
+            meta: {
+              source: "selection",
+              columnId: sel.colId,
+              columnLabel: sel.colLabel ?? sel.colId,
+              entityLabel,
+              nodeText: sel.text,
+              nodeId: sel.id,
+              fromDate,
+              toDate,
+            },
           },
         });
       });
@@ -548,18 +850,33 @@ function initApp() {
           const { sourceArrow, targetArrow } = graph.deriveArrows(direction);
 
           const targetKey = nodeKey(displayCol, id);
+          const entityLabel = getEntityLabel(displayCol);
           if (!nodes.has(targetKey)) {
             nodes.set(targetKey, {
               data: {
                 id: targetKey,
                 type: displayCol,
                 label: text,
+                entityLabel,
                 color,
                 seed: false,
+                meta: { ...row, entityLabel },
               },
             });
-          } else if (!nodes.get(targetKey).data?.color && color) {
-            nodes.get(targetKey).data.color = color;
+          } else {
+            const nodeData = nodes.get(targetKey).data || {};
+            if (!nodeData.color && color) {
+              nodeData.color = color;
+            }
+            if (!nodeData.meta) {
+              nodeData.meta = { ...row };
+            }
+            if (!nodeData.meta.entityLabel) {
+              nodeData.meta.entityLabel = entityLabel;
+            }
+            if (!nodeData.entityLabel) {
+              nodeData.entityLabel = entityLabel;
+            }
           }
 
           const sourceKey = nodeKey(sel.colId, sel.id);
@@ -569,6 +886,13 @@ function initApp() {
             const existing = edges.get(existingEdgeId);
             if (existing && !existing.data.label && label) {
               existing.data.label = label;
+            }
+            if (existing && !existing.data.meta) {
+              existing.data.meta = {
+                ...row,
+                sourceColId: sel.colId,
+                sourceId: sel.id,
+              };
             }
             return;
           }
@@ -585,16 +909,18 @@ function initApp() {
               direction,
               sourceArrow,
               targetArrow,
+              meta: {
+                ...row,
+                sourceColId: sel.colId,
+                sourceId: sel.id,
+              },
             },
           });
           edgePairMap.set(pairKey, edgeIdentifier);
         });
       }
 
-      graph.renderGraph(
-        Array.from(nodes.values()),
-        Array.from(edges.values())
-      );
+      graph.renderGraph(Array.from(nodes.values()), Array.from(edges.values()));
       setGraphReadyState(true);
       setStatus(`Graph ready. Nodes: ${nodes.size}, Edges: ${edges.size}`);
       graph.queueAutoExpand();
