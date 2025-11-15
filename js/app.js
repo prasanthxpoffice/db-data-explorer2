@@ -137,6 +137,27 @@ function initApp() {
     theme: defaults.theme,
   };
   const translations = window.TRANSLATIONS || {};
+  const ensureTranslations = (lang, entries) => {
+    translations[lang] = translations[lang] || {};
+    Object.entries(entries).forEach(([key, value]) => {
+      if (!(key in translations[lang])) {
+        translations[lang][key] = value;
+      }
+    });
+  };
+
+  ensureTranslations("en", {
+    timelineRecordLabel: "Record timeline",
+    timelineRecordHint:
+      "Enable to capture each change (may impact performance).",
+    timelineRecordStart: "Recording enabled",
+  });
+  ensureTranslations("ar", {
+    timelineRecordLabel: "تسجيل المسار الزمني",
+    timelineRecordHint: "فعّل الخيار لتسجيل كل تغيير (قد يؤثر على الأداء).",
+    timelineRecordStart: "تم تشغيل التسجيل",
+  });
+
   const translate = (key, fallback) => {
     const lang = state.language;
     return (
