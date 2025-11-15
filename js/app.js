@@ -39,6 +39,8 @@ function initApp() {
     theme: defaults.theme,
   };
 
+  const rootEl = document.querySelector(".graph-app") || document.body;
+
   const els = {
     language: document.getElementById("language"),
     viewsDropdown: document.getElementById("viewsDropdown"),
@@ -70,6 +72,7 @@ function initApp() {
     themeSelect: document.getElementById("themeSelect"),
     exportPng: document.getElementById("exportPng"),
     loadingOverlay: document.getElementById("loading-overlay"),
+    root: rootEl,
   };
 
   const setStatus = (msg) => {
@@ -102,7 +105,7 @@ function initApp() {
   if (els.themeSelect) {
     els.themeSelect.value = defaults.theme;
   }
-  document.body.dataset.theme = state.theme;
+  rootEl.dataset.theme = state.theme;
 
   const loadingTracker = window.GraphApp.createLoadingTracker(
     els.loadingOverlay
@@ -236,7 +239,7 @@ function initApp() {
   }
 
   function setGraphReadyState(hasGraph) {
-    document.body.classList.toggle("graph-ready", hasGraph);
+    rootEl.classList.toggle("graph-ready", hasGraph);
     if (els.clearGraph) {
       els.clearGraph.style.display = hasGraph ? "block" : "none";
     }
@@ -406,7 +409,7 @@ function initApp() {
 
   els.themeSelect?.addEventListener("change", () => {
     state.theme = els.themeSelect.value;
-    document.body.dataset.theme = state.theme;
+    rootEl.dataset.theme = state.theme;
     graph.refreshStyle();
   });
 
