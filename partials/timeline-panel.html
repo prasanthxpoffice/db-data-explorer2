@@ -1,0 +1,47 @@
+<div class="filter-panel timeline-panel" id="timelinePanel">
+  <div class="panel-toggle" id="toggleTimeline">
+    <h3 data-i18n="timelineTitle">Timeline</h3>
+    <button
+      type="button"
+      id="timelineChevron"
+      class="chevron-btn"
+      aria-label="Toggle timeline panel"
+      data-i18n-aria-label="toggleTimelineAria"
+    >
+      v
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-section">
+      <div class="switch-row">
+        <span data-i18n="timelineRecordLabel">Record timeline</span>
+        <label class="switch">
+          <input type="checkbox" id="timelineRecordToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <small class="hint" data-i18n="timelineRecordHint">
+        Enable to capture each change (may impact performance).
+      </small>
+    </div>
+    <div class="panel-section">
+      <label for="timelineSlider" data-i18n="timelineSliderLabel">Timeline step</label>
+      <input id="timelineSlider" type="range" min="0" max="0" value="0" disabled />
+      <div id="timelineStepLabel" class="timeline-step-label" data-i18n="timelineEmpty">
+        No history yet.
+      </div>
+      <small id="timelineHint" class="timeline-hint" data-i18n="timelineHint">
+        Drag the slider to review each change.
+      </small>
+    </div>
+    <div class="panel-section">
+      <button id="timelineClearFuture" class="danger" disabled data-i18n="timelineClearFuture">
+        Clear future changes
+      </button>
+    </div>
+    <div class="panel-section">
+      <h4 data-i18n="timelineLogTitle">History</h4>
+      <ul id="timelineLog" class="timeline-log"></ul>
+    </div>
+  </div>
+</div>

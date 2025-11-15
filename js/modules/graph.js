@@ -15,11 +15,30 @@
     onNodeSelected,
     onEdgeSelected,
     onGraphCleared,
+    onElementsAdded,
   }) {
     let cy = null;
     const expandedNodes = new Set();
     let autoExpandRunning = false;
     let autoExpandGeneration = 0;
+
+    function cloneElement(el) {
+      if (!el || !el.data) return null;
+      const clone = { data: { ...el.data } };
+      if (el.classes) clone.classes = el.classes;
+      if ("selectable" in el) clone.selectable = el.selectable;
+      if ("grabbable" in el) clone.grabbable = el.grabbable;
+      if ("locked" in el) clone.locked = el.locked;
+      if (el.group) clone.group = el.group;
+      if (el.style) clone.style = { ...el.style };
+      if (el.position) clone.position = { ...el.position };
+      return clone;
+    }
+
+    function cloneElements(list) {
+      if (!Array.isArray(list)) return [];
+      return list.map(cloneElement).filter(Boolean);
+    }
 
     function getEntityLabel(colId) {
       const key = (colId || "").toLowerCase();
@@ -111,7 +130,10 @@
       return { name: layoutName, padding: 20, animate };
     }
 
-    async function appendExpansionResults(sourceKey, { force = false } = {}) {
+    async function appendExpansionResults(
+      sourceKey,
+      { force = false, reason = "expand" } = {}
+    ) {
       if (!cy) return false;
       if (!force && expandedNodes.has(sourceKey)) return false;
       const parsed = (sourceKey || "").split(":");
@@ -230,6 +252,15 @@
       }
       updateLeafVisibility();
 
+      if ((nodesToAdd.length || edgesToAdd.length) && onElementsAdded) {
+        onElementsAdded({
+          nodes: nodesToAdd.map(cloneElement).filter(Boolean),
+          edges: edgesToAdd.map(cloneElement).filter(Boolean),
+          reason,
+          sourceId: sourceKey,
+        });
+      }
+
       expandedNodes.add(sourceKey);
       return nodesToAdd.length > 0 || edgesToAdd.length > 0;
     }
@@ -250,7 +281,9 @@
             .toArray()
             .find((n) => !expandedNodes.has(n.id()));
           if (!nextNode) break;
-          await appendExpansionResults(nextNode.id());
+          await appendExpansionResults(nextNode.id(), {
+            reason: "autoExpand",
+          });
         }
         if (token === autoExpandGeneration) {
           setStatus(translate("statusAutoExpandComplete"));
@@ -480,6 +513,48 @@
       updateLeafVisibility();
     }
 
+    function replaceElements(
+      nodes,
+      edges,
+      { resetState = false, applyLayout = true } = {}
+    ) {
+      if (!cy) {
+        renderGraph(nodes, edges);
+      } else {
+        cy.startBatch();
+        try {
+          cy.elements().remove();
+          cy.add(cloneElements(nodes));
+          cy.add(cloneElements(edges));
+        } finally {
+          cy.endBatch();
+        }
+        if (applyLayout) {
+          runLayout();
+        } else {
+          cy.resize();
+        }
+        updateLeafVisibility();
+      }
+      if (resetState) {
+        expandedNodes.clear();
+        autoExpandRunning = false;
+        autoExpandGeneration++;
+      }
+    }
+
+    function getElementsSnapshot() {
+      if (!cy) {
+        return { nodes: [], edges: [] };
+      }
+      const nodeJson = cy.nodes().map((node) => node.json());
+      const edgeJson = cy.edges().map((edge) => edge.json());
+      return {
+        nodes: cloneElements(nodeJson),
+        edges: cloneElements(edgeJson),
+      };
+    }
+
     function renderGraph(nodes, edges) {
       const style = buildStyle();
       if (!cy) {
@@ -515,7 +590,10 @@
         }
         setStatus(translate("statusExpandingNode"));
         try {
-          await appendExpansionResults(tapped.id(), { force: true });
+          await appendExpansionResults(tapped.id(), {
+            force: true,
+            reason: "manualExpand",
+          });
           queueAutoExpand();
           setStatus(translate("statusNodeExpanded"));
         } catch (err) {
@@ -543,6 +621,8 @@
 
     return {
       renderGraph,
+      replaceElements,
+      getElementsSnapshot,
       clearGraph,
       resetAutoExpandProgress,
       queueAutoExpand,

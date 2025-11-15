@@ -1,3 +1,102 @@
+const DEFAULT_NODE_COLOR = "#87cefa";
+const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
+
+function escapeHtml(val = "") {
+  return String(val)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizeDateValue(value) {
+  if (!value) return null;
+  const text =
+    value instanceof Date && !Number.isNaN(value.getTime())
+      ? value.toISOString().slice(0, 10)
+      : String(value).slice(0, 10);
+  return DEFAULT_DATE_SENTINELS.has(text) ? null : text;
+}
+
+function directionSymbol(directionRaw) {
+  const dir = (directionRaw || "").trim();
+  switch (dir) {
+    case "->":
+    case "outgoing":
+      return "&rarr;";
+    case "<-":
+    case "incoming":
+      return "&larr;";
+    case "<->":
+    case "both":
+      return "&harr;";
+    default:
+      return "&rarr;";
+  }
+}
+
+function pickMetaValue(meta, ...keys) {
+  if (!meta) return undefined;
+  for (const key of keys) {
+    if (key in meta && meta[key] !== undefined && meta[key] !== null) {
+      return meta[key];
+    }
+    if (typeof key !== "string") continue;
+    const lower = key.charAt(0).toLowerCase() + key.slice(1);
+    if (lower in meta && meta[lower] !== undefined && meta[lower] !== null) {
+      return meta[lower];
+    }
+    const upper = key.charAt(0).toUpperCase() + key.slice(1);
+    if (upper in meta && meta[upper] !== undefined && meta[upper] !== null) {
+      return meta[upper];
+    }
+  }
+  return undefined;
+}
+
+function initCollapsiblePanel({ panel, toggleButton, chevron, onToggle }) {
+  if (!panel) return null;
+  let collapsed = false;
+
+  const applyState = () => {
+    panel.classList.toggle("collapsed", collapsed);
+    if (chevron) {
+      chevron.textContent = collapsed ? ">" : "v";
+    }
+    onToggle?.(collapsed);
+  };
+
+  const toggle = () => {
+    collapsed = !collapsed;
+    applyState();
+  };
+
+  if (toggleButton) {
+    toggleButton.addEventListener("click", toggle);
+  }
+
+  if (chevron && (!toggleButton || !toggleButton.contains(chevron))) {
+    chevron.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggle();
+    });
+  }
+
+  applyState();
+
+  return {
+    toggle,
+    setCollapsed(next) {
+      const shouldCollapse = !!next;
+      if (shouldCollapse === collapsed) return;
+      collapsed = shouldCollapse;
+      applyState();
+    },
+    isCollapsed: () => collapsed,
+  };
+}
+
 function initApp() {
   if (!window.APP_CONFIG) {
     const fallback = document.getElementById("status");
@@ -20,7 +119,6 @@ function initApp() {
     hideLeaves: APP_CONFIG.defaults?.hideLeaves ?? false,
     theme: APP_CONFIG.defaults?.theme ?? "light",
   };
-  const DEFAULT_NODE_COLOR = "#87cefa";
 
   const dateDefaults = {
     from: "1900-01-01",
@@ -94,6 +192,14 @@ function initApp() {
     pathEndDisplay: document.getElementById("pathEndDisplay"),
     pathStartLabel: document.getElementById("pathStartLabel"),
     pathEndLabel: document.getElementById("pathEndLabel"),
+    timelinePanel: document.getElementById("timelinePanel"),
+    toggleTimeline: document.getElementById("toggleTimeline"),
+    timelineChevron: document.getElementById("timelineChevron"),
+    timelineSlider: document.getElementById("timelineSlider"),
+    timelineStepLabel: document.getElementById("timelineStepLabel"),
+    timelineLog: document.getElementById("timelineLog"),
+    timelineClearFuture: document.getElementById("timelineClearFuture"),
+    timelineRecordToggle: document.getElementById("timelineRecordToggle"),
     viewsToggleLabel: document.getElementById("viewsToggleLabel"),
     layoutSelect: document.getElementById("layoutSelect"),
     animateToggle: document.getElementById("animateToggle"),
@@ -111,17 +217,15 @@ function initApp() {
     settings: document.getElementById("settings-panel-root"),
     info: document.getElementById("info-panel-root"),
     path: document.getElementById("path-panel-root"),
+    timeline: document.getElementById("timeline-panel-root"),
   };
   const floatingButtons = Array.from(
     document.querySelectorAll(".panel-trigger")
   );
   let activeFloatingPanel = null;
   let pathModule = null;
-
-  const handleNodeSelection = (payload) => {
-    renderNodeInfo(payload);
-    pathModule?.onNodeTap?.(payload);
-  };
+  let timelineModule = null;
+  let timelineRecordingEnabled = false;
 
   const infoPanelEls = {
     content: null,
@@ -133,76 +237,50 @@ function initApp() {
     return infoPanelEls.hydrated;
   }
   const defaultInfoHtml = () => `<p>${translate("infoPrompt")}</p>`;
-  const escapeHtml = (val = "") =>
-    String(val)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
-
-  const pickMetaValue = (meta, ...keys) => {
-    if (!meta) return undefined;
-    for (const key of keys) {
-      if (key in meta && meta[key] !== undefined && meta[key] !== null) {
-        return meta[key];
-      }
-      const lower =
-        typeof key === "string"
-          ? key.charAt(0).toLowerCase() + key.slice(1)
-          : key;
-      if (
-        typeof lower === "string" &&
-        lower in meta &&
-        meta[lower] !== undefined &&
-        meta[lower] !== null
-      ) {
-        return meta[lower];
-      }
-      const upper =
-        typeof key === "string"
-          ? key.charAt(0).toUpperCase() + key.slice(1)
-          : key;
-      if (
-        typeof upper === "string" &&
-        upper in meta &&
-        meta[upper] !== undefined &&
-        meta[upper] !== null
-      ) {
-        return meta[upper];
-      }
-    }
-    return undefined;
+  const infoPanel = window.GraphApp.createInfoPanel({
+    infoPanelEls,
+    hydrate: hydrateInfoPanel,
+    defaultInfoHtml,
+    translate,
+    directionSymbol,
+    pickMetaValue,
+    escapeHtml,
+    normalizeDateValue,
+    getEntityLabel,
+    defaultNodeColor: DEFAULT_NODE_COLOR,
+  });
+  const handleNodeSelection = (payload) => {
+    infoPanel.renderNodeInfo(payload);
+    pathModule?.onNodeTap?.(payload);
   };
 
-  const normalizeDateValue = (value) => {
-    if (!value) return null;
-    let str = value;
-    if (value instanceof Date && !isNaN(value.getTime())) {
-      str = value.toISOString().slice(0, 10);
+  const isTimelineRecording = () =>
+    timelineRecordingEnabled && !!timelineModule;
+
+  const recordTimelineSnapshot = (type, labelText) => {
+    if (!isTimelineRecording()) return;
+    const snapshot = graph.getElementsSnapshot();
+    if (!snapshot.nodes.length && !snapshot.edges.length) return;
+    const payload = {
+      label: labelText,
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+    };
+    if (type === "reset") {
+      timelineModule.recordReset(payload);
     } else {
-      str = String(value).slice(0, 10);
+      timelineModule.recordAppend(payload);
     }
-    if (DEFAULT_DATE_SENTINELS.has(str)) return null;
-    return str;
   };
 
-  const directionSymbol = (directionRaw) => {
-    const dir = (directionRaw || "").trim();
-    switch (dir) {
-      case "->":
-      case "outgoing":
-        return "&rarr;";
-      case "<-":
-      case "incoming":
-        return "&larr;";
-      case "<->":
-      case "both":
-        return "&harr;";
-      default:
-        return "&rarr;";
-    }
+  const handleElementsAdded = (payload) => {
+    if (!isTimelineRecording()) return;
+    const labelBase =
+      payload.reason === "autoExpand"
+        ? translate("timelineAutoExpandStep")
+        : translate("timelineExpandStep");
+    const detail = payload.sourceId ? ` (${payload.sourceId})` : "";
+    recordTimelineSnapshot("append", `${labelBase}${detail}`);
   };
 
   function applyDomTranslations() {
@@ -232,196 +310,9 @@ function initApp() {
       });
   }
 
-  function resetInfoPanel() {
-    if (!infoPanelEls.hydrated) {
-      hydrateInfoPanel();
-    }
-    const content = infoPanelEls.content;
-    if (content) {
-      content.innerHTML = defaultInfoHtml();
-    }
-  }
-
-  function renderNodeInfo(data) {
-    if (!infoPanelEls.hydrated && !hydrateInfoPanel()) return;
-    const content = infoPanelEls.content;
-    if (!data || !content) return;
-    const connections = Array.isArray(data.connections) ? data.connections : [];
-    const connectionItems = connections.length
-      ? `<div class="connections-grid">${connections
-          .map((conn) => {
-            const neighbor = conn.neighbor || {};
-            const arrowSymbol = directionSymbol(conn.orientation);
-            const neighborColor = neighbor.color || DEFAULT_NODE_COLOR;
-            const neighborColorChip = `<span class="color-chip" style="background:${escapeHtml(
-              neighborColor
-            )}"></span>`;
-            const rows = [
-              { label: translate("direction"), value: arrowSymbol },
-              { label: translate("color"), value: neighborColorChip },
-              {
-                label: translate("description"),
-                value: escapeHtml(
-                  neighbor.label || translate("unnamed")
-                ),
-              },
-              {
-                label: translate("entity"),
-                value: escapeHtml(
-                  neighbor.entityLabel ||
-                    neighbor.entity ||
-                    getEntityLabel(neighbor.type) ||
-                    "-"
-                ),
-              },
-              {
-                label: translate("code"),
-                value: escapeHtml(neighbor.type || "-"),
-              },
-              {
-                label: translate("refNo"),
-                value: escapeHtml(neighbor.id || "-"),
-              },
-              {
-                label: translate("relation"),
-                value: escapeHtml(conn.edgeLabel || translate("noLabel")),
-              },
-            ];
-            const table = `<table class="info-table info-table-compact">${rows
-              .map(
-                (row) =>
-                  `<tr><th>${row.label}</th><td>${row.value}</td></tr>`
-              )
-              .join("")}</table>`;
-            return `<div class="connection-card">${table}</div>`;
-          })
-          .join("")}</div>`
-      : `<p>${translate("noConnections")}</p>`;
-
-    const meta = data.meta || {};
-    const colorValue =
-      data.color || meta.color || data.dataColor || DEFAULT_NODE_COLOR;
-    const colorSwatch = `<span class="color-chip" style="background:${escapeHtml(
-      colorValue
-    )}"></span>`;
-    const entity =
-      pickMetaValue(meta, "nodeTypeLabel", "entityLabel", "entity", "Entity") ||
-      data.entityLabel ||
-      getEntityLabel(data.type) ||
-      "-";
-    const description =
-      pickMetaValue(meta, "text", "description", "nodeText") ||
-      data.label ||
-      translate("nodeFallback");
-    const dateValue = normalizeDateValue(
-      pickMetaValue(meta, "nodeDate", "date")
-    );
-    const code =
-      pickMetaValue(meta, "displayCol", "code", "columnId") || data.type || "-";
-    const refNo =
-      pickMetaValue(meta, "id", "refNumber", "refNo", "nodeId") ||
-      data.id ||
-      "-";
-
-    const detailRows = [
-      { label: translate("color"), value: `${colorSwatch}` },
-      { label: translate("entity"), value: escapeHtml(entity) },
-      {
-        label: translate("description"),
-        value: escapeHtml(description || translate("nodeFallback")),
-      },
-    ];
-    if (dateValue) {
-      detailRows.push({ label: translate("date"), value: escapeHtml(dateValue) });
-    }
-    detailRows.push(
-      { label: translate("code"), value: escapeHtml(code) },
-      { label: translate("refNo"), value: escapeHtml(refNo) }
-    );
-
-    const detailTable = `<div class="info-table-container"><table class="info-table">${detailRows
-      .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
-      .join("")}</table></div>`;
-
-    content.innerHTML = `
-      <div class="info-block info-block-table">
-        ${detailTable}
-      </div>
-      <div class="info-block">
-        <h4>${translate("connectedNodes")} (${connections.length})</h4>
-        ${connectionItems}
-      </div>
-    `;
-  }
-
-  function renderEdgeInfo(data) {
-    if (!infoPanelEls.hydrated && !hydrateInfoPanel()) return;
-    const content = infoPanelEls.content;
-    if (!data || !content) return;
-    const directionValue = data.direction || translate("directionNone");
-    const directionText = `${directionSymbol(data.direction)} ${escapeHtml(
-      directionValue
-    )}`;
-    const tableRows = [
-      { label: translate("direction"), value: directionText },
-      {
-        label: translate("edgeLabel"),
-        value: escapeHtml(data.label || translate("noLabel")),
-      },
-    ];
-    const detailTable = `<div class="info-table-container"><table class="info-table">${tableRows
-      .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
-      .join("")}</table></div>`;
-    const cardMarkup = (title, node) => {
-      if (!node) return "";
-      const color = node.color || DEFAULT_NODE_COLOR;
-      const colorChip = `<span class="color-chip" style="background:${escapeHtml(
-        color
-      )}"></span>`;
-      const entity =
-        node.entityLabel || getEntityLabel(node.type) || node.type || "-";
-      const rows = [
-        { label: translate("color"), value: colorChip },
-        {
-          label: translate("description"),
-          value: escapeHtml(node.label || translate("nodeFallback")),
-        },
-        { label: translate("entity"), value: escapeHtml(entity) },
-        {
-          label: translate("code"),
-          value: escapeHtml(node.type || "-"),
-        },
-        {
-          label: translate("refNo"),
-          value: escapeHtml(node.id || "-"),
-        },
-      ];
-      const table = `<table class="info-table info-table-compact">${rows
-        .map(
-          (row) =>
-            `<tr><th>${row.label}</th><td>${row.value}</td></tr>`
-        )
-        .join("")}</table>`;
-      return `<div class="connection-card">
-        <div class="connection-card-title">${escapeHtml(title)}</div>
-        ${table}
-      </div>`;
-    };
-    content.innerHTML = `
-      <div class="info-block info-block-table">
-        ${detailTable}
-      </div>
-      <div class="info-block">
-        <div class="connections-grid">
-          ${cardMarkup(translate("sourceNode"), data.source)}
-          ${cardMarkup(translate("targetNode"), data.target)}
-        </div>
-      </div>
-    `;
-  }
 
   hydrateInfoPanel();
-  resetInfoPanel();
+  infoPanel.reset();
 
   const setStatus = (msg) => {
     if (els.status) {
@@ -480,8 +371,9 @@ function initApp() {
     unwrapData: data.unwrapData,
     getMaxNodes,
     onNodeSelected: handleNodeSelection,
-    onEdgeSelected: renderEdgeInfo,
-    onGraphCleared: resetInfoPanel,
+    onEdgeSelected: infoPanel.renderEdgeInfo,
+    onGraphCleared: infoPanel.reset,
+    onElementsAdded: handleElementsAdded,
   });
 
   pathModule =
@@ -501,6 +393,46 @@ function initApp() {
       getCy: () => window.cy || null,
     }) || null;
 
+  timelineModule =
+    window.GraphApp.createTimelineModule({
+      els: {
+        root: document.getElementById("timelinePanel"),
+        slider: document.getElementById("timelineSlider"),
+        stepLabel: document.getElementById("timelineStepLabel"),
+        log: document.getElementById("timelineLog"),
+        clearBtn: document.getElementById("timelineClearFuture"),
+      },
+      translate,
+      setStatus,
+      applySnapshot: (nodes, edges) => {
+        graph.replaceElements(nodes, edges, {
+          resetState: false,
+          applyLayout: true,
+        });
+      },
+      onApplied: () => {
+        infoPanel.reset();
+        pathModule?.onGraphCleared?.();
+      },
+    }) || null;
+
+  const updateTimelineRecording = () => {
+    if (!els.timelineRecordToggle) {
+      timelineRecordingEnabled = false;
+      return;
+    }
+    const enabled = !!els.timelineRecordToggle.checked;
+    if (enabled === timelineRecordingEnabled) return;
+    timelineRecordingEnabled = enabled;
+    if (!enabled) {
+      timelineModule?.resetHistory?.();
+    } else {
+      recordTimelineSnapshot("reset", translate("timelineRecordStart"));
+    }
+  };
+  els.timelineRecordToggle?.addEventListener("change", updateTimelineRecording);
+  updateTimelineRecording();
+
   function dirFor(lang) {
     return lang === "ar" ? "rtl" : "ltr";
   }
@@ -519,97 +451,33 @@ function initApp() {
     data.updateViewIndicator();
     renderSelections();
     pathModule?.onLanguageChanged?.();
+    timelineModule?.refreshTranslations?.();
   }
 
-  let filtersCollapsed = false;
-  const updateFilterPanel = () => {
-    if (!els.filterPanel) return;
-    if (filtersCollapsed) {
-      els.filterPanel.classList.add("collapsed");
-      if (els.filterChevron) els.filterChevron.textContent = ">";
-    } else {
-      els.filterPanel.classList.remove("collapsed");
-      if (els.filterChevron) els.filterChevron.textContent = "v";
-    }
-    updateGraphPadding();
-  };
-
-  if (els.filterPanel && els.toggleFilters) {
-    updateFilterPanel();
-    els.toggleFilters.addEventListener("click", () => {
-      filtersCollapsed = !filtersCollapsed;
-      updateFilterPanel();
-    });
-  }
-  if (els.filterChevron && !els.toggleFilters.contains(els.filterChevron)) {
-    els.filterChevron.addEventListener("click", (event) => {
-      event.stopPropagation();
-      filtersCollapsed = !filtersCollapsed;
-      updateFilterPanel();
-    });
-  }
-
-  let configCollapsed = false;
-  const updateConfigPanel = () => {
-    if (!els.configPanel) return;
-    if (configCollapsed) {
-      els.configPanel.classList.add("collapsed");
-      if (els.configChevron) els.configChevron.textContent = ">";
-    } else {
-      els.configPanel.classList.remove("collapsed");
-      if (els.configChevron) els.configChevron.textContent = "v";
-    }
-    updateGraphPadding();
-  };
-
-  if (els.configPanel && els.toggleConfig) {
-    updateConfigPanel();
-    els.toggleConfig.addEventListener("click", () => {
-      configCollapsed = !configCollapsed;
-      updateConfigPanel();
-    });
-  }
-  if (
-    els.configChevron &&
-    (!els.toggleConfig || !els.toggleConfig.contains(els.configChevron))
-  ) {
-    els.configChevron.addEventListener("click", (event) => {
-      event.stopPropagation();
-      configCollapsed = !configCollapsed;
-      updateConfigPanel();
-    });
-  }
-
-  let pathCollapsed = false;
-  const updatePathPanel = () => {
-    if (!els.pathPanel) return;
-    if (pathCollapsed) {
-      els.pathPanel.classList.add("collapsed");
-      if (els.pathChevron) els.pathChevron.textContent = ">";
-    } else {
-      els.pathPanel.classList.remove("collapsed");
-      if (els.pathChevron) els.pathChevron.textContent = "v";
-    }
-    updateGraphPadding();
-  };
-
-  if (els.pathPanel && els.togglePath) {
-    updatePathPanel();
-    els.togglePath.addEventListener("click", () => {
-      pathCollapsed = !pathCollapsed;
-      updatePathPanel();
-    });
-  }
-  if (
-    els.pathChevron &&
-    (!els.togglePath || !els.togglePath.contains(els.pathChevron))
-  ) {
-    els.pathChevron.addEventListener("click", (event) => {
-      event.stopPropagation();
-      pathCollapsed = !pathCollapsed;
-      updatePathPanel();
-    });
-  }
+  initCollapsiblePanel({
+    panel: els.filterPanel,
+    toggleButton: els.toggleFilters,
+    chevron: els.filterChevron,
+    onToggle: updateGraphPadding,
+  });
+  initCollapsiblePanel({
+    panel: els.configPanel,
+    toggleButton: els.toggleConfig,
+    chevron: els.configChevron,
+    onToggle: updateGraphPadding,
+  });
+  initCollapsiblePanel({
+    panel: els.pathPanel,
+    toggleButton: els.togglePath,
+    chevron: els.pathChevron,
+    onToggle: updateGraphPadding,
+  });
+  initCollapsiblePanel({
+    panel: els.timelinePanel,
+    toggleButton: els.toggleTimeline,
+    chevron: els.timelineChevron,
+    onToggle: updateGraphPadding,
+  });
 
   function renderSelections() {
     if (!els.selections) return;
@@ -644,11 +512,26 @@ function initApp() {
     }
   }
 
+  const graphPanelButtons = Array.from(
+    document.querySelectorAll(".panel-trigger.graph-panel")
+  );
+  updateTopPanelVisibility(false);
+
+  function updateTopPanelVisibility(hasGraph) {
+    graphPanelButtons.forEach((btn) => {
+      btn.style.display = hasGraph ? "" : "none";
+    });
+    if (!hasGraph && activeFloatingPanel && ["info", "path", "timeline"].includes(activeFloatingPanel)) {
+      closeFloatingPanels();
+    }
+  }
+
   function setGraphReadyState(hasGraph) {
     rootEl.classList.toggle("graph-ready", hasGraph);
     if (els.clearGraph) {
       els.clearGraph.style.display = hasGraph ? "block" : "none";
     }
+    updateTopPanelVisibility(hasGraph);
   }
 
   function getMaxNodes() {
@@ -667,7 +550,7 @@ function initApp() {
     applyLanguageChrome();
     data.clearItems(true);
     data.loadViews();
-    resetInfoPanel();
+    infoPanel.reset();
   });
 
   const isCompactLayout = () =>
@@ -875,6 +758,7 @@ function initApp() {
   els.clearGraph?.addEventListener("click", () => {
     pathModule?.onGraphCleared?.();
     graph.clearGraph();
+    timelineModule?.resetHistory?.();
     state.selected = [];
     renderSelections();
     setGraphReadyState(false);
@@ -1053,11 +937,12 @@ function initApp() {
         });
       }
 
-      graph.renderGraph(
-        Array.from(nodes.values()),
-        Array.from(edges.values())
-      );
+      const nodeArray = Array.from(nodes.values());
+      const edgeArray = Array.from(edges.values());
+
+      graph.renderGraph(nodeArray, edgeArray);
       pathModule?.onGraphUpdated?.();
+      recordTimelineSnapshot("reset", translate("timelineFilterStep"));
       setGraphReadyState(true);
       setStatus(
         `${translate("statusGraphReady")} ${translate("statusNodes")}: ${
@@ -1094,3 +979,193 @@ document.addEventListener("partials:ready", () => {
   partialsReady = true;
   tryInit();
 });
+
+function createInfoPanel({
+  infoPanelEls,
+  hydrate,
+  defaultInfoHtml,
+  translate,
+  directionSymbol,
+  pickMetaValue,
+  escapeHtml,
+  normalizeDateValue,
+  getEntityLabel,
+  defaultNodeColor,
+}) {
+  const ensureContent = () => {
+    if (!infoPanelEls.hydrated && !hydrate()) {
+      return null;
+    }
+    return infoPanelEls.content;
+  };
+
+  const buildTable = (rows, modifier) => {
+    const className = ["info-table", modifier].filter(Boolean).join(" ");
+    return `<table class="${className}">${rows
+      .map((row) => `<tr><th>${row.label}</th><td>${row.value}</td></tr>`)
+      .join("")}</table>`;
+  };
+
+  const buildTableContainer = (rows, modifier) =>
+    `<div class="info-table-container">${buildTable(rows, modifier)}</div>`;
+
+  const colorChip = (color) =>
+    `<span class="color-chip" style="background:${escapeHtml(
+      color
+    )}"></span>`;
+
+  const renderConnectionCard = (conn) => {
+    const neighbor = conn.neighbor || {};
+    const rows = [
+      { label: translate("direction"), value: directionSymbol(conn.orientation) },
+      { label: translate("color"), value: colorChip(neighbor.color || defaultNodeColor) },
+      {
+        label: translate("description"),
+        value: escapeHtml(neighbor.label || translate("unnamed")),
+      },
+      {
+        label: translate("entity"),
+        value: escapeHtml(
+          neighbor.entityLabel ||
+            neighbor.entity ||
+            getEntityLabel(neighbor.type) ||
+            "-"
+        ),
+      },
+      { label: translate("code"), value: escapeHtml(neighbor.type || "-") },
+      { label: translate("refNo"), value: escapeHtml(neighbor.id || "-") },
+      {
+        label: translate("relation"),
+        value: escapeHtml(conn.edgeLabel || translate("noLabel")),
+      },
+    ];
+    return `<div class="connection-card">${buildTable(
+      rows,
+      "info-table-compact"
+    )}</div>`;
+  };
+
+  const renderConnections = (connections) =>
+    connections.length
+      ? `<div class="connections-grid">${connections
+          .map(renderConnectionCard)
+          .join("")}</div>`
+      : `<p>${translate("noConnections")}</p>`;
+
+  const renderNodeInfo = (data) => {
+    const content = ensureContent();
+    if (!data || !content) return;
+    const connections = Array.isArray(data.connections)
+      ? data.connections
+      : [];
+    const meta = data.meta || {};
+    const colorValue =
+      data.color || meta.color || data.dataColor || defaultNodeColor;
+    const entity =
+      pickMetaValue(meta, "nodeTypeLabel", "entityLabel", "entity", "Entity") ||
+      data.entityLabel ||
+      getEntityLabel(data.type) ||
+      "-";
+    const description =
+      pickMetaValue(meta, "text", "description", "nodeText") ||
+      data.label ||
+      translate("nodeFallback");
+    const dateValue = normalizeDateValue(
+      pickMetaValue(meta, "nodeDate", "date")
+    );
+    const code =
+      pickMetaValue(meta, "displayCol", "code", "columnId") ||
+      data.type ||
+      "-";
+    const refNo =
+      pickMetaValue(meta, "id", "refNumber", "refNo", "nodeId") ||
+      data.id ||
+      "-";
+
+    const detailRows = [
+      { label: translate("color"), value: colorChip(colorValue) },
+      { label: translate("entity"), value: escapeHtml(entity) },
+      {
+        label: translate("description"),
+        value: escapeHtml(description || translate("nodeFallback")),
+      },
+    ];
+    if (dateValue) {
+      detailRows.push({
+        label: translate("date"),
+        value: escapeHtml(dateValue),
+      });
+    }
+    detailRows.push(
+      { label: translate("code"), value: escapeHtml(code) },
+      { label: translate("refNo"), value: escapeHtml(refNo) }
+    );
+
+    const detailTable = buildTableContainer(detailRows);
+    content.innerHTML = `
+      <div class="info-block info-block-table">
+        ${detailTable}
+      </div>
+      <div class="info-block">
+        <h4>${translate("connectedNodes")} (${connections.length})</h4>
+        ${renderConnections(connections)}
+      </div>
+    `;
+  };
+
+  const renderEdgeNodeCard = (title, node) => {
+    if (!node) return "";
+    const entity =
+      node.entityLabel || getEntityLabel(node.type) || node.type || "-";
+    const rows = [
+      { label: translate("color"), value: colorChip(node.color || defaultNodeColor) },
+      {
+        label: translate("description"),
+        value: escapeHtml(node.label || translate("nodeFallback")),
+      },
+      { label: translate("entity"), value: escapeHtml(entity) },
+      { label: translate("code"), value: escapeHtml(node.type || "-") },
+      { label: translate("refNo"), value: escapeHtml(node.id || "-") },
+    ];
+    return `<div class="connection-card">
+      <div class="connection-card-title">${escapeHtml(title)}</div>
+      ${buildTable(rows, "info-table-compact")}
+    </div>`;
+  };
+
+  const renderEdgeInfo = (data) => {
+    const content = ensureContent();
+    if (!data || !content) return;
+    const directionValue = data.direction || translate("directionNone");
+    const directionText = `${directionSymbol(data.direction)} ${escapeHtml(
+      directionValue
+    )}`;
+    const tableRows = [
+      { label: translate("direction"), value: directionText },
+      {
+        label: translate("edgeLabel"),
+        value: escapeHtml(data.label || translate("noLabel")),
+      },
+    ];
+    const detailTable = buildTableContainer(tableRows);
+    content.innerHTML = `
+      <div class="info-block info-block-table">
+        ${detailTable}
+      </div>
+      <div class="info-block">
+        <div class="connections-grid">
+          ${renderEdgeNodeCard(translate("sourceNode"), data.source)}
+          ${renderEdgeNodeCard(translate("targetNode"), data.target)}
+        </div>
+      </div>
+    `;
+  };
+
+  const reset = () => {
+    const content = ensureContent();
+    if (!content) return;
+    content.innerHTML = defaultInfoHtml();
+  };
+
+  return { renderNodeInfo, renderEdgeInfo, reset };
+}
