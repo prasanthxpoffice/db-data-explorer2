@@ -1,0 +1,50 @@
+<div class="filter-panel path-panel" id="pathPanel">
+  <div class="panel-toggle" id="togglePath">
+    <h3 data-i18n="pathTitle">Paths</h3>
+    <button
+      type="button"
+      id="pathChevron"
+      class="chevron-btn"
+      aria-label="Toggle path panel"
+      data-i18n-aria-label="toggleFiltersAria"
+    >
+      v
+    </button>
+  </div>
+  <div class="panel-body">
+    <p class="path-instructions" data-i18n="pathInstruction">
+      Click two nodes on the graph to define a path.
+    </p>
+
+    <div class="path-selection">
+      <div class="path-selection-item" id="pathStartDisplay">
+        <span class="path-selection-label" data-i18n="pathStart">
+          Start node
+        </span>
+        <strong id="pathStartLabel" data-i18n="pathStartPlaceholder">
+          Select start node
+        </strong>
+      </div>
+      <div class="path-selection-item" id="pathEndDisplay">
+        <span class="path-selection-label" data-i18n="pathEnd">
+          End node
+        </span>
+        <strong id="pathEndLabel" data-i18n="pathEndPlaceholder">
+          Select end node
+        </strong>
+      </div>
+    </div>
+
+    <div class="panel-section action-row path-actions">
+      <button id="pathAdd" data-i18n="pathAdd" disabled>Add path</button>
+      <button id="pathReset" class="secondary" data-i18n="pathReset">
+        Reset
+      </button>
+    </div>
+
+    <div class="panel-section">
+      <h4 data-i18n="pathListTitle">Saved paths</h4>
+      <ul id="pathList"></ul>
+    </div>
+  </div>
+</div>

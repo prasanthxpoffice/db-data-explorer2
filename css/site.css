@@ -85,7 +85,8 @@
 
 .graph-app #filter-panel-root,
 .graph-app #settings-panel-root,
-.graph-app #info-panel-root{
+.graph-app #info-panel-root,
+.graph-app #path-panel-root{
   position: absolute;
   top: 64px;
   width: var(--panel-width);
@@ -105,14 +106,20 @@
   right: 16px;
 }
 
-.graph-app #info-panel-root{
+.graph-app #path-panel-root{
   right: 16px;
   left: auto;
+  transform: translateY(-15px);
+}
+
+.graph-app #info-panel-root{
+  right: 16px;
 }
 
 .graph-app #filter-panel-root.open,
 .graph-app #settings-panel-root.open,
-.graph-app #info-panel-root.open{
+.graph-app #info-panel-root.open,
+.graph-app #path-panel-root.open{
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -132,6 +139,12 @@ html[dir="rtl"] .graph-app #settings-panel-root{
 html[dir="rtl"] .graph-app #info-panel-root{
   left: 16px;
   right: auto;
+}
+
+html[dir="rtl"] .graph-app #path-panel-root{
+  right: auto;
+  left: 16px;
+  transform: translateY(-15px);
 }
 
 .graph-app #cy{
@@ -293,6 +306,12 @@ html[dir="rtl"] .graph-app #info-panel-root{
 .graph-app .connection-card strong{
   font-size: 13px;
 }
+
+.graph-app .connection-card-title{
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
 .graph-app .connection-card-title{
   font-size: 13px;
   font-weight: 600;
@@ -307,6 +326,144 @@ html[dir="rtl"] .graph-app #info-panel-root{
 }
 html[dir="rtl"] .graph-app .info-table-compact th{
   width: 40%;
+}
+
+.graph-app .path-panel ul{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.graph-app .path-instructions{
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.graph-app[data-theme="dark"] .path-instructions{
+  color: #cbd5f5;
+}
+
+.graph-app .path-selection{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.graph-app .path-selection-item{
+  padding: 10px 12px;
+  border: 1px dashed rgba(15, 23, 42, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.graph-app .path-selection-item.selected{
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(11, 85, 0, 0.08);
+}
+
+.graph-app[data-theme="dark"] .path-selection-item{
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(248, 250, 255, 0.25);
+}
+
+.graph-app[data-theme="dark"] .path-selection-item.selected{
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #34d399;
+}
+
+.graph-app .path-selection-item strong{
+  display: block;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.graph-app .path-selection-label{
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .path-selection-label{
+  color: #cbd5f5;
+}
+
+.graph-app .path-actions{
+  gap: 8px;
+}
+
+.graph-app .path-entry{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 8px 10px;
+  gap: 10px;
+}
+
+.graph-app[data-theme="dark"] .path-entry{
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.graph-app .path-entry.empty{
+  justify-content: center;
+  font-style: italic;
+  color: #6b7280;
+}
+
+.graph-app .path-entry-info{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.graph-app .path-color-dot{
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+}
+
+.graph-app .path-entry-actions{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.graph-app .path-entry-focus{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .path-entry-focus{
+  color: #dbeafe;
+}
+
+.graph-app .path-entry-actions button{
+  border: none;
+  background: rgba(179, 55, 55, 0.15);
+  color: #b33737;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.graph-app[data-theme="dark"] .path-entry-actions button{
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
 }
 .graph-app .info-table-container{
   border: 1px solid rgba(15, 23, 42, 0.1);
@@ -859,7 +1016,10 @@ html[dir="rtl"] .graph-app .info-table td{
     margin: 0 0 12px;
   }
 
-  .graph-app #filter-panel-root, .graph-app #settings-panel-root{
+  .graph-app #filter-panel-root,
+  .graph-app #settings-panel-root,
+  .graph-app #info-panel-root,
+  .graph-app #path-panel-root{
     position: static;
     width: 100%;
     pointer-events: auto;

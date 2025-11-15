@@ -411,6 +411,20 @@
           },
         },
         {
+          selector: "node.path-node",
+          style: {
+            "border-width": 5,
+            "border-color": "data(pathColor)",
+            "border-opacity": 1,
+          },
+        },
+        {
+          selector: "node.path-node.path-node-dim",
+          style: {
+            "border-opacity": 0.25,
+          },
+        },
+        {
           selector: "edge",
           style: {
             "curve-style": "bezier",
@@ -427,6 +441,29 @@
             "text-outline-width": palette.edgeOutlineWidth,
           },
         },
+        {
+          selector: "edge.path-base-edge",
+          style: {
+            "line-color": "data(pathColor)",
+            width: 6,
+            "target-arrow-shape": "data(pathTargetShape)",
+            "source-arrow-shape": "data(pathSourceShape)",
+            "target-arrow-color": "data(pathColor)",
+            "source-arrow-color": "data(pathColor)",
+            "line-cap": "round",
+            "z-index-compare": "manual",
+            "z-index": 999,
+            opacity: 1,
+          },
+        },
+        {
+          selector: "edge.path-base-edge.path-edge-dim",
+          style: {
+            opacity: 0.35,
+          },
+        },
+        { selector: "node.path-focus-hidden", style: { display: "none" } },
+        { selector: "edge.path-focus-hidden", style: { display: "none" } },
         { selector: "node.leaf-hidden", style: { display: "none" } },
         { selector: "edge.leaf-edge-hidden", style: { display: "none" } },
       ];

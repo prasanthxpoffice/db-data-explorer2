@@ -84,6 +84,16 @@ function initApp() {
     configPanel: document.getElementById("configPanel"),
     toggleConfig: document.getElementById("toggleConfig"),
     configChevron: document.getElementById("configChevron"),
+    pathPanel: document.getElementById("pathPanel"),
+    togglePath: document.getElementById("togglePath"),
+    pathChevron: document.getElementById("pathChevron"),
+    pathAdd: document.getElementById("pathAdd"),
+    pathReset: document.getElementById("pathReset"),
+    pathList: document.getElementById("pathList"),
+    pathStartDisplay: document.getElementById("pathStartDisplay"),
+    pathEndDisplay: document.getElementById("pathEndDisplay"),
+    pathStartLabel: document.getElementById("pathStartLabel"),
+    pathEndLabel: document.getElementById("pathEndLabel"),
     viewsToggleLabel: document.getElementById("viewsToggleLabel"),
     layoutSelect: document.getElementById("layoutSelect"),
     animateToggle: document.getElementById("animateToggle"),
@@ -100,11 +110,18 @@ function initApp() {
     filters: document.getElementById("filter-panel-root"),
     settings: document.getElementById("settings-panel-root"),
     info: document.getElementById("info-panel-root"),
+    path: document.getElementById("path-panel-root"),
   };
   const floatingButtons = Array.from(
     document.querySelectorAll(".panel-trigger")
   );
   let activeFloatingPanel = null;
+  let pathModule = null;
+
+  const handleNodeSelection = (payload) => {
+    renderNodeInfo(payload);
+    pathModule?.onNodeTap?.(payload);
+  };
 
   const infoPanelEls = {
     content: null,
@@ -462,10 +479,27 @@ function initApp() {
     callApi: data.callApi,
     unwrapData: data.unwrapData,
     getMaxNodes,
-    onNodeSelected: renderNodeInfo,
+    onNodeSelected: handleNodeSelection,
     onEdgeSelected: renderEdgeInfo,
     onGraphCleared: resetInfoPanel,
   });
+
+  pathModule =
+    window.GraphApp.createPathModule({
+      els: {
+        root: document.getElementById("pathPanel"),
+        addBtn: document.getElementById("pathAdd"),
+        resetBtn: document.getElementById("pathReset"),
+        list: document.getElementById("pathList"),
+        startDisplay: document.getElementById("pathStartDisplay"),
+        endDisplay: document.getElementById("pathEndDisplay"),
+        startLabel: document.getElementById("pathStartLabel"),
+        endLabel: document.getElementById("pathEndLabel"),
+      },
+      translate,
+      setStatus,
+      getCy: () => window.cy || null,
+    }) || null;
 
   function dirFor(lang) {
     return lang === "ar" ? "rtl" : "ltr";
@@ -484,6 +518,7 @@ function initApp() {
     applyDomTranslations();
     data.updateViewIndicator();
     renderSelections();
+    pathModule?.onLanguageChanged?.();
   }
 
   let filtersCollapsed = false;
@@ -542,6 +577,37 @@ function initApp() {
       event.stopPropagation();
       configCollapsed = !configCollapsed;
       updateConfigPanel();
+    });
+  }
+
+  let pathCollapsed = false;
+  const updatePathPanel = () => {
+    if (!els.pathPanel) return;
+    if (pathCollapsed) {
+      els.pathPanel.classList.add("collapsed");
+      if (els.pathChevron) els.pathChevron.textContent = ">";
+    } else {
+      els.pathPanel.classList.remove("collapsed");
+      if (els.pathChevron) els.pathChevron.textContent = "v";
+    }
+    updateGraphPadding();
+  };
+
+  if (els.pathPanel && els.togglePath) {
+    updatePathPanel();
+    els.togglePath.addEventListener("click", () => {
+      pathCollapsed = !pathCollapsed;
+      updatePathPanel();
+    });
+  }
+  if (
+    els.pathChevron &&
+    (!els.togglePath || !els.togglePath.contains(els.pathChevron))
+  ) {
+    els.pathChevron.addEventListener("click", (event) => {
+      event.stopPropagation();
+      pathCollapsed = !pathCollapsed;
+      updatePathPanel();
     });
   }
 
@@ -615,7 +681,15 @@ function initApp() {
     });
     Object.entries(floatingPanels).forEach(([key, panel]) => {
       if (!panel) return;
-      panel.classList.toggle("open", activeFloatingPanel === key);
+      const isActive = activeFloatingPanel === key;
+      panel.classList.toggle("open", isActive);
+      if (key === "path" && pathModule) {
+        if (isActive) {
+          pathModule.onPanelOpen?.();
+        } else {
+          pathModule.onPanelClose?.();
+        }
+      }
     });
   }
 
@@ -636,8 +710,14 @@ function initApp() {
     const panel = floatingPanels[name];
     if (!panel) return;
 
-    if (isCompactLayout()) {
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const compact = isCompactLayout();
+    if (compact) {
+      if (activeFloatingPanel === name) {
+        setActivePanel(null);
+      } else {
+        setActivePanel(name);
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
       return;
     }
 
@@ -696,6 +776,7 @@ function initApp() {
     }
     if (els.autoExpandToggle?.checked) {
       graph.resetAutoExpandProgress();
+      pathModule?.onGraphCleared?.();
     }
   });
 
@@ -792,6 +873,7 @@ function initApp() {
   });
 
   els.clearGraph?.addEventListener("click", () => {
+    pathModule?.onGraphCleared?.();
     graph.clearGraph();
     state.selected = [];
     renderSelections();
@@ -844,6 +926,7 @@ function initApp() {
 
       setStatus(translate("statusBuildingGraph"));
       graph.resetAutoExpandProgress();
+      pathModule?.onGraphCleared?.();
 
       const nodes = new Map();
       const edges = new Map();
@@ -970,7 +1053,11 @@ function initApp() {
         });
       }
 
-      graph.renderGraph(Array.from(nodes.values()), Array.from(edges.values()));
+      graph.renderGraph(
+        Array.from(nodes.values()),
+        Array.from(edges.values())
+      );
+      pathModule?.onGraphUpdated?.();
       setGraphReadyState(true);
       setStatus(
         `${translate("statusGraphReady")} ${translate("statusNodes")}: ${
