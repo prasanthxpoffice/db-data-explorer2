@@ -1,4 +1,4 @@
-.graph-app{
+.graph-app {
   --panel-width: 340px;
   --panel-gap: 10px;
   --panel-bg: linear-gradient(180deg, #fefefe 0%, #f4f6fb 100%);
@@ -7,11 +7,11 @@
   --accent: #0b5;
 }
 
-.graph-app *{
+.graph-app * {
   box-sizing: border-box;
 }
 
-.graph-app{
+.graph-app {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   color: #111;
@@ -21,12 +21,12 @@
   width: 100%;
 }
 
-.graph-app[data-theme="dark"]{
+.graph-app[data-theme="dark"] {
   background: #0b1525;
   color: #f1f5ff;
 }
 
-.graph-app .wrap{
+.graph-app .wrap {
   position: relative;
   width: 100%;
   min-height: 100vh;
@@ -34,7 +34,7 @@
   padding: 0;
 }
 
-.graph-app #panel-trigger-root{
+.graph-app #panel-trigger-root {
   position: absolute;
   top: 12px;
   left: 50%;
@@ -42,7 +42,7 @@
   z-index: 6;
 }
 
-.graph-app .panel-trigger-bar{
+.graph-app .panel-trigger-bar {
   display: flex;
   gap: 10px;
   padding: 6px 14px;
@@ -52,12 +52,12 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
 }
 
-.graph-app[data-theme="dark"] .panel-trigger-bar{
+.graph-app[data-theme="dark"] .panel-trigger-bar {
   background: rgba(17, 24, 39, 0.92);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-.graph-app .panel-trigger{
+.graph-app .panel-trigger {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -71,23 +71,24 @@
   transition: background 0.2s ease;
 }
 
-.graph-app .panel-trigger .icon{
+.graph-app .panel-trigger .icon {
   font-size: 16px;
 }
 
-.graph-app .panel-trigger.active{
+.graph-app .panel-trigger.active {
   background: rgba(0, 0, 0, 0.08);
 }
 
-.graph-app[data-theme="dark"] .panel-trigger.active{
+.graph-app[data-theme="dark"] .panel-trigger.active {
   background: rgba(255, 255, 255, 0.2);
 }
 
 .graph-app #filter-panel-root,
 .graph-app #settings-panel-root,
+.graph-app #legends-panel-root,
 .graph-app #info-panel-root,
 .graph-app #path-panel-root,
-.graph-app #timeline-panel-root{
+.graph-app #timeline-panel-root {
   position: absolute;
   top: 64px;
   width: var(--panel-width);
@@ -99,88 +100,94 @@
   z-index: 5;
 }
 
-.graph-app #filter-panel-root{
+.graph-app #filter-panel-root {
   left: 16px;
 }
 
-.graph-app #settings-panel-root{
+.graph-app #settings-panel-root {
   right: 16px;
 }
 
-.graph-app #path-panel-root{
+.graph-app #legends-panel-root {
+  right: 16px;
+  width: 720px;
+}
+
+.graph-app #path-panel-root {
   right: 16px;
   left: auto;
   transform: translateY(-15px);
 }
 
-.graph-app #info-panel-root{
+.graph-app #info-panel-root {
   right: 16px;
 }
 
-.graph-app #timeline-panel-root{
+.graph-app #timeline-panel-root {
   right: 16px;
 }
 
 .graph-app #filter-panel-root.open,
 .graph-app #settings-panel-root.open,
+.graph-app #legends-panel-root.open,
 .graph-app #info-panel-root.open,
 .graph-app #path-panel-root.open,
-.graph-app #timeline-panel-root.open{
+.graph-app #timeline-panel-root.open {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0);
 }
 
-html[dir="rtl"] .graph-app #filter-panel-root{
+html[dir="rtl"] .graph-app #filter-panel-root {
   left: auto;
   right: 16px;
 }
 
-html[dir="rtl"] .graph-app #settings-panel-root{
+html[dir="rtl"] .graph-app #settings-panel-root {
   right: auto;
   left: 16px;
 }
 
-html[dir="rtl"] .graph-app #info-panel-root{
+html[dir="rtl"] .graph-app #info-panel-root {
   left: 16px;
   right: auto;
 }
 
-html[dir="rtl"] .graph-app #path-panel-root{
+html[dir="rtl"] .graph-app #path-panel-root {
   right: auto;
   left: 16px;
   transform: translateY(-15px);
 }
 
-.graph-app #cy{
+.graph-app #cy {
   width: 100%;
   min-height: 100vh;
   background: #fdfefe;
 }
 
-.graph-app[data-theme="dark"] #cy{
+.graph-app[data-theme="dark"] #cy {
   background: #0f1929;
 }
 
-.graph-app #cy{
+.graph-app #cy {
   position: relative;
   width: 100%;
   min-height: 100vh;
   background: #fdfefe;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: 0;
 }
 
-.graph-app[data-theme="dark"] #cy{
+.graph-app[data-theme="dark"] #cy {
   background: #0f1929;
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-@media (max-width: 1100px){
+@media (max-width: 1100px) {
   .graph-app #filter-panel-root,
   .graph-app #settings-panel-root,
-  .graph-app #info-panel-root{
+  .graph-app #info-panel-root {
     position: static;
     width: 100%;
     pointer-events: auto;
@@ -188,14 +195,14 @@ html[dir="rtl"] .graph-app #path-panel-root{
     visibility: visible;
     transform: none;
   }
-  .graph-app .wrap{
+  .graph-app .wrap {
     display: flex;
     flex-direction: column;
     gap: 24px;
   }
 }
 
-.graph-app .filter-panel{
+.graph-app .filter-panel {
   width: 100%;
   height: 100%;
   background: var(--panel-bg);
@@ -210,34 +217,34 @@ html[dir="rtl"] .graph-app #path-panel-root{
   max-height: calc(100vh - 140px);
 }
 
-.graph-app[data-theme="dark"] .filter-panel{
+.graph-app[data-theme="dark"] .filter-panel {
   background: linear-gradient(180deg, #0f192c 0%, #0b1423 100%);
   border-color: #2c384f;
   color: #f4f6ff;
 }
 .graph-app .settings-panel,
-.graph-app .path-panel{
+.graph-app .path-panel {
   max-height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
 }
 
-.graph-app .info-panel{
+.graph-app .info-panel {
   height: auto;
   max-height: calc(100vh - 160px);
 }
-.graph-app .info-panel .info-body{
+.graph-app .info-panel .info-body {
   max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
 
-.graph-app .info-panel{
+.graph-app .info-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.graph-app .info-header{
+.graph-app .info-header {
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -245,11 +252,11 @@ html[dir="rtl"] .graph-app #path-panel-root{
   gap: 10px;
 }
 
-.graph-app .info-body{
+.graph-app .info-body {
   padding-top: 0;
 }
 
-.graph-app .info-content{
+.graph-app .info-content {
   flex: 1;
   padding: 0 16px 16px;
   overflow-y: auto;
@@ -260,20 +267,20 @@ html[dir="rtl"] .graph-app #path-panel-root{
   color: #1f2933;
 }
 
-.graph-app[data-theme="dark"] .info-content{
+.graph-app[data-theme="dark"] .info-content {
   color: #e2e8f0;
 }
 
-.graph-app .info-block h4{
+.graph-app .info-block h4 {
   margin: 0 0 4px;
   font-size: 14px;
 }
 
-.graph-app .info-block-table{
+.graph-app .info-block-table {
   margin-top: 10px;
 }
 
-.graph-app .color-chip{
+.graph-app .color-chip {
   display: inline-block;
   width: 14px;
   height: 14px;
@@ -282,18 +289,18 @@ html[dir="rtl"] .graph-app #path-panel-root{
   margin-right: 6px;
 }
 
-.graph-app[data-theme="dark"] .color-chip{
+.graph-app[data-theme="dark"] .color-chip {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-.graph-app .connections-grid{
+.graph-app .connections-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
   margin-top: 10px;
 }
 
-.graph-app .connection-card{
+.graph-app .connection-card {
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 12px;
   padding: 10px 12px;
@@ -301,48 +308,48 @@ html[dir="rtl"] .graph-app #path-panel-root{
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
-.graph-app[data-theme="dark"] .connection-card{
+.graph-app[data-theme="dark"] .connection-card {
   background: rgba(15, 23, 42, 0.75);
   border-color: rgba(148, 163, 184, 0.3);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
 }
 
-.graph-app .connection-card h5{
+.graph-app .connection-card h5 {
   margin: 0 0 6px;
   font-size: 14px;
 }
 
-.graph-app .connection-card p{
+.graph-app .connection-card p {
   margin: 2px 0;
   font-size: 13px;
 }
 
-.graph-app .connection-card strong{
+.graph-app .connection-card strong {
   font-size: 13px;
 }
 
-.graph-app .connection-card-title{
+.graph-app .connection-card-title {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 6px;
 }
-.graph-app .connection-card-title{
+.graph-app .connection-card-title {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 6px;
 }
-.graph-app .info-table-compact th{
+.graph-app .info-table-compact th {
   width: 40%;
   font-size: 12px;
 }
-.graph-app .info-table-compact td{
+.graph-app .info-table-compact td {
   font-size: 12px;
 }
-html[dir="rtl"] .graph-app .info-table-compact th{
+html[dir="rtl"] .graph-app .info-table-compact th {
   width: 40%;
 }
 
-.graph-app .path-panel ul{
+.graph-app .path-panel ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -351,67 +358,67 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   gap: 8px;
 }
 
-.graph-app .path-instructions{
+.graph-app .path-instructions {
   margin: 0 0 12px;
   font-size: 13px;
   color: #4b5563;
 }
 
-.graph-app[data-theme="dark"] .path-instructions{
+.graph-app[data-theme="dark"] .path-instructions {
   color: #cbd5f5;
 }
 
-.graph-app .path-selection{
+.graph-app .path-selection {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 12px;
 }
 
-.graph-app .path-selection-item{
+.graph-app .path-selection-item {
   padding: 10px 12px;
   border: 1px dashed rgba(15, 23, 42, 0.2);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.6);
 }
 
-.graph-app .path-selection-item.selected{
+.graph-app .path-selection-item.selected {
   border-style: solid;
   border-color: var(--accent);
   background: rgba(11, 85, 0, 0.08);
 }
 
-.graph-app[data-theme="dark"] .path-selection-item{
+.graph-app[data-theme="dark"] .path-selection-item {
   background: rgba(15, 23, 42, 0.5);
   border-color: rgba(248, 250, 255, 0.25);
 }
 
-.graph-app[data-theme="dark"] .path-selection-item.selected{
+.graph-app[data-theme="dark"] .path-selection-item.selected {
   background: rgba(16, 185, 129, 0.12);
   border-color: #34d399;
 }
 
-.graph-app .path-selection-item strong{
+.graph-app .path-selection-item strong {
   display: block;
   font-size: 15px;
   margin-top: 4px;
 }
 
-.graph-app .path-selection-label{
+.graph-app .path-selection-label {
   font-size: 12px;
   font-weight: 600;
   color: #475569;
 }
 
-.graph-app[data-theme="dark"] .path-selection-label{
+.graph-app[data-theme="dark"] .path-selection-label {
   color: #cbd5f5;
 }
 
-.graph-app .path-actions{
+.graph-app .path-actions {
   gap: 8px;
 }
 
-.graph-app .path-entry{
+.graph-app .path-entry {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -421,24 +428,24 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   gap: 10px;
 }
 
-.graph-app[data-theme="dark"] .path-entry{
+.graph-app[data-theme="dark"] .path-entry {
   border-color: rgba(148, 163, 184, 0.3);
 }
 
-.graph-app .path-entry.empty{
+.graph-app .path-entry.empty {
   justify-content: center;
   font-style: italic;
   color: #6b7280;
 }
 
-.graph-app .path-entry-info{
+.graph-app .path-entry-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
 }
 
-.graph-app .path-color-dot{
+.graph-app .path-color-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -446,14 +453,14 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
 }
 
-.graph-app .path-entry-actions{
+.graph-app .path-entry-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
 }
 
-.graph-app .path-entry-focus{
+.graph-app .path-entry-focus {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -461,11 +468,11 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   color: #475569;
 }
 
-.graph-app[data-theme="dark"] .path-entry-focus{
+.graph-app[data-theme="dark"] .path-entry-focus {
   color: #dbeafe;
 }
 
-.graph-app .path-entry-actions button{
+.graph-app .path-entry-actions button {
   border: none;
   background: rgba(179, 55, 55, 0.15);
   color: #b33737;
@@ -475,31 +482,31 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   cursor: pointer;
 }
 
-.graph-app[data-theme="dark"] .path-entry-actions button{
+.graph-app[data-theme="dark"] .path-entry-actions button {
   background: rgba(248, 113, 113, 0.2);
   color: #f87171;
 }
 
-.graph-app .timeline-panel input[type="range"]{
+.graph-app .timeline-panel input[type="range"] {
   width: 100%;
   cursor: pointer;
   accent-color: var(--accent);
 }
 
-.graph-app .timeline-step-label{
+.graph-app .timeline-step-label {
   margin-top: 6px;
   font-size: 12px;
   color: #475569;
   font-weight: 600;
 }
 
-.graph-app .timeline-hint{
+.graph-app .timeline-hint {
   margin-top: 4px;
   font-size: 11px;
   color: #94a3b8;
 }
 
-.graph-app .timeline-log{
+.graph-app .timeline-log {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -510,7 +517,7 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   overflow-y: auto;
 }
 
-.graph-app .timeline-log li{
+.graph-app .timeline-log li {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 10px;
   padding: 8px 10px;
@@ -518,55 +525,55 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.graph-app .timeline-log li.active{
+.graph-app .timeline-log li.active {
   border-color: var(--accent);
   background: rgba(11, 85, 0, 0.08);
 }
 
-.graph-app .timeline-log li strong{
+.graph-app .timeline-log li strong {
   font-size: 13px;
   display: block;
 }
 
-.graph-app .timeline-log li small{
+.graph-app .timeline-log li small {
   display: block;
   margin-top: 4px;
   font-size: 11px;
   color: #64748b;
 }
 
-.graph-app .switch-row{
+.graph-app .switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.graph-app[data-theme="dark"] .timeline-step-label{
+.graph-app[data-theme="dark"] .timeline-step-label {
   color: #cbd5f5;
 }
 
-.graph-app[data-theme="dark"] .timeline-hint{
+.graph-app[data-theme="dark"] .timeline-hint {
   color: #94a3b8;
 }
 
-.graph-app[data-theme="dark"] .timeline-log li{
+.graph-app[data-theme="dark"] .timeline-log li {
   border-color: rgba(148, 163, 184, 0.3);
   background: rgba(15, 23, 42, 0.4);
 }
 
-.graph-app[data-theme="dark"] .timeline-log li.active{
+.graph-app[data-theme="dark"] .timeline-log li.active {
   background: rgba(34, 197, 94, 0.2);
 }
 
-.graph-app .timeline-log-empty{
+.graph-app .timeline-log-empty {
   text-align: center;
   font-size: 12px;
   color: #94a3b8;
   border: none;
   padding: 6px 0;
 }
-.graph-app .info-table-container{
+.graph-app .info-table-container {
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 12px;
   padding: 10px 12px;
@@ -574,81 +581,81 @@ html[dir="rtl"] .graph-app .info-table-compact th{
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
-.graph-app[data-theme="dark"] .info-table-container{
+.graph-app[data-theme="dark"] .info-table-container {
   background: rgba(15, 23, 42, 0.75);
   border-color: rgba(148, 163, 184, 0.3);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
 }
 
-.graph-app .info-table{
+.graph-app .info-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.graph-app .info-table tr + tr{
+.graph-app .info-table tr + tr {
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-.graph-app[data-theme="dark"] .info-table tr + tr{
+.graph-app[data-theme="dark"] .info-table tr + tr {
   border-color: rgba(148, 163, 184, 0.3);
 }
 
-.graph-app .info-table th{
+.graph-app .info-table th {
   text-align: left;
   font-weight: 600;
   padding: 6px 4px 6px 0;
   width: 35%;
   font-size: 13px;
 }
-html[dir="rtl"] .graph-app .info-table th{
+html[dir="rtl"] .graph-app .info-table th {
   text-align: right;
   padding: 6px 0 6px 4px;
 }
 
-.graph-app .info-table td{
+.graph-app .info-table td {
   padding: 6px 0;
   font-size: 13px;
   word-break: break-word;
 }
-html[dir="rtl"] .graph-app .info-table td{
+html[dir="rtl"] .graph-app .info-table td {
   text-align: left;
 }
 
-.graph-app .info-list li{
+.graph-app .info-list li {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 8px;
   background: #fff;
 }
 
-.graph-app[data-theme="dark"] .info-list li{
+.graph-app[data-theme="dark"] .info-list li {
   border-color: #334155;
   background: rgba(15, 23, 42, 0.6);
 }
 
-.graph-app .info-list small{
+.graph-app .info-list small {
   display: block;
   color: #64748b;
   font-size: 12px;
 }
 
-.graph-app[data-theme="dark"] .info-list small{
+.graph-app[data-theme="dark"] .info-list small {
   color: #cbd5f5;
 }
 
-.filter-panel.collapsed .panel-body{
+.filter-panel.collapsed .panel-body {
   display: none;
 }
 
-.graph-app .filter-panel.collapsed .panel-toggle h3{
+.graph-app .filter-panel.collapsed .panel-toggle h3 {
   display: none;
 }
 
-.graph-app .filter-panel.collapsed .chevron-btn{
+.graph-app .filter-panel.collapsed .chevron-btn {
   transform: rotate(180deg);
 }
 
-.graph-app .panel-toggle{
+.graph-app .panel-toggle {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -656,12 +663,12 @@ html[dir="rtl"] .graph-app .info-table td{
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.graph-app .panel-toggle h3{
+.graph-app .panel-toggle h3 {
   margin: 0;
   font-size: 16px;
 }
 
-.graph-app .chevron-btn{
+.graph-app .chevron-btn {
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -677,22 +684,22 @@ html[dir="rtl"] .graph-app .info-table td{
   transition: background 0.2s ease;
 }
 
-.graph-app[data-theme="dark"] .chevron-btn{
+.graph-app[data-theme="dark"] .chevron-btn {
   background: #1e293b;
   border-color: #475569;
   color: #e2e8f0;
 }
 
-.graph-app .chevron-btn:hover{
+.graph-app .chevron-btn:hover {
   background: #eef2ff;
 }
 
-.graph-app .chevron-btn:focus-visible{
+.graph-app .chevron-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.panel-body{
+.panel-body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
@@ -705,34 +712,85 @@ html[dir="rtl"] .graph-app .info-table td{
   min-height: 0;
 }
 
-.panel-body::-webkit-scrollbar{
+.panel-body::-webkit-scrollbar {
   width: 6px;
 }
 
-.panel-body::-webkit-scrollbar-thumb{
+.panel-body::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.25);
   border-radius: 999px;
 }
 
-.panel-body::-webkit-scrollbar-track{
+.panel-body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.graph-app .panel-section label, .graph-app .panel-section small{
+.graph-app .panel-section label,
+.graph-app .panel-section small {
   color: inherit;
 }
 
-.graph-app[data-theme="dark"] .panel-body{
+.graph-app .hidden {
+  display: none !important;
+}
+
+.graph-app[data-theme="dark"] .panel-body {
   color: #f4f6ff;
 }
 
-.graph-app .panel-section label{
+.graph-app .panel-section label {
   display: block;
   font-weight: 600;
   margin-bottom: 6px;
 }
 
-.graph-app select, .graph-app input, .graph-app button{
+.graph-app .auto-expand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.graph-app .auto-expand-toggle-group {
+  flex: 1;
+}
+
+.graph-app .auto-expand-depth-group {
+  min-width: 110px;
+  flex: 0 0 110px;
+}
+
+.graph-app .auto-expand-depth-group select {
+  width: 100%;
+}
+
+.graph-app .status-indicator-wrapper{
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 6;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.graph-app[data-theme="dark"] .status-indicator-wrapper{
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.graph-app .status-indicator-wrapper .status-text{
+  color: inherit;
+}
+
+ .graph-app select,
+ .graph-app input,
+ .graph-app button {
   width: 100%;
   padding: 8px 10px;
   border-radius: 8px;
@@ -741,7 +799,7 @@ html[dir="rtl"] .graph-app .info-table td{
   font-size: 14px;
 }
 
-.graph-app button{
+.graph-app button {
   background: var(--accent);
   color: #fff;
   border: none;
@@ -750,35 +808,37 @@ html[dir="rtl"] .graph-app .info-table td{
   transition: opacity 0.2s ease;
 }
 
-.graph-app button:hover{
+.graph-app button:hover {
   opacity: 0.9;
 }
 
-.graph-app button.secondary{
+.graph-app button.secondary {
   background: #555;
 }
 
-.graph-app[data-theme="dark"] select, .graph-app[data-theme="dark"] input{
+.graph-app[data-theme="dark"] select,
+.graph-app[data-theme="dark"] input {
   background: #0b1220;
   color: #f8fafc;
   border-color: #2c384f;
 }
 
-.graph-app[data-theme="dark"] input::placeholder, .graph-app[data-theme="dark"] textarea::placeholder{
+.graph-app[data-theme="dark"] input::placeholder,
+.graph-app[data-theme="dark"] textarea::placeholder {
   color: #94a3b8;
 }
 
-.graph-app[data-theme="dark"] button.secondary{
+.graph-app[data-theme="dark"] button.secondary {
   background: #4b5563;
 }
 
-.graph-app .multi-select{
+.graph-app .multi-select {
   position: relative;
   width: 100%;
   z-index: 5;
 }
 
-.graph-app .multi-select > button{
+.graph-app .multi-select > button {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -791,13 +851,13 @@ html[dir="rtl"] .graph-app .info-table td{
   font-weight: 600;
 }
 
-.graph-app[data-theme="dark"] .multi-select > button{
+.graph-app[data-theme="dark"] .multi-select > button {
   background: #111a2b;
   color: #f4f6ff;
   border-color: #2c384f;
 }
 
-.graph-app .multi-options{
+.graph-app .multi-options {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -816,7 +876,7 @@ html[dir="rtl"] .graph-app .info-table td{
   z-index: 6;
 }
 
-.graph-app .multi-options::before{
+.graph-app .multi-options::before {
   content: "";
   position: absolute;
   top: -8px;
@@ -829,21 +889,21 @@ html[dir="rtl"] .graph-app .info-table td{
   border-top: 1px solid #d7dce8;
 }
 
-.graph-app .multi-select.open .multi-options{
+.graph-app .multi-select.open .multi-options {
   display: flex;
 }
 
-.graph-app[data-theme="dark"] .multi-options{
+.graph-app[data-theme="dark"] .multi-options {
   background: #111a2a;
   border-color: #334155;
   color: #f8fafc;
 }
 
-.graph-app[data-theme="dark"] .multi-options::before{
+.graph-app[data-theme="dark"] .multi-options::before {
   border-color: #334155;
 }
 
-.graph-app .multi-options label{
+.graph-app .multi-options label {
   display: grid;
   grid-template-columns: 20px 1fr;
   gap: 8px;
@@ -855,28 +915,28 @@ html[dir="rtl"] .graph-app .info-table td{
   white-space: nowrap;
 }
 
-.graph-app .multi-options label input{
+.graph-app .multi-options label input {
   margin: 0;
 }
 
-.graph-app .multi-options label span{
+.graph-app .multi-options label span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.graph-app .multi-options label:hover{
+.graph-app .multi-options label:hover {
   background: #eef3ff;
 }
 
-.graph-app .suggestions{
+.graph-app .suggestions {
   position: relative;
 }
 
-.graph-app #itemSearch{
+.graph-app #itemSearch {
   width: 100%;
 }
 
-.graph-app .suggestions-panel{
+.graph-app .suggestions-panel {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -893,11 +953,11 @@ html[dir="rtl"] .graph-app .info-table td{
   padding: 4px;
 }
 
-.graph-app .suggestions-panel.show{
+.graph-app .suggestions-panel.show {
   display: block;
 }
 
-.graph-app .suggestions-panel button{
+.graph-app .suggestions-panel button {
   border: none;
   background: transparent;
   padding: 10px;
@@ -907,42 +967,44 @@ html[dir="rtl"] .graph-app .info-table td{
   border-radius: 8px;
 }
 
-.graph-app .suggestions-panel button:hover, .graph-app .suggestions-panel button.active{
+.graph-app .suggestions-panel button:hover,
+.graph-app .suggestions-panel button.active {
   background: #eef6ff;
 }
 
-.graph-app[data-theme="dark"] .suggestions-panel{
+.graph-app[data-theme="dark"] .suggestions-panel {
   background: #111a2a;
   border-color: #334155;
   color: #f8fafc;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.55);
 }
 
-.graph-app[data-theme="dark"] .suggestions-panel button{
+.graph-app[data-theme="dark"] .suggestions-panel button {
   color: inherit;
   border-bottom-color: #1f2937;
 }
 
-.graph-app[data-theme="dark"] .suggestions-panel button:hover, .graph-app[data-theme="dark"] .suggestions-panel button.active{
+.graph-app[data-theme="dark"] .suggestions-panel button:hover,
+.graph-app[data-theme="dark"] .suggestions-panel button.active {
   background: rgba(59, 130, 246, 0.25);
 }
 
-.graph-app .row{
+.graph-app .row {
   display: flex;
   gap: var(--panel-gap);
   flex-wrap: wrap;
 }
 
-.graph-app .action-row{
+.graph-app .action-row {
   display: flex;
   gap: 10px;
 }
 
-.graph-app .action-row button{
+.graph-app .action-row button {
   flex: 1;
 }
 
-.graph-app .selections-panel ul{
+.graph-app .selections-panel ul {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -951,7 +1013,7 @@ html[dir="rtl"] .graph-app .info-table td{
   gap: 10px;
 }
 
-.graph-app .selections-panel li{
+.graph-app .selections-panel li {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 30px 10px 10px;
@@ -959,13 +1021,13 @@ html[dir="rtl"] .graph-app .info-table td{
   background: #fff;
 }
 
-.graph-app[data-theme="dark"] .selections-panel li{
+.graph-app[data-theme="dark"] .selections-panel li {
   border-color: #334155;
   background: #111a2a;
   color: #f5f7ff;
 }
 
-.graph-app .info-row{
+.graph-app .info-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -973,7 +1035,7 @@ html[dir="rtl"] .graph-app .info-table td{
   flex-wrap: wrap;
 }
 
-.graph-app .remove-pill{
+.graph-app .remove-pill {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -990,11 +1052,11 @@ html[dir="rtl"] .graph-app .info-table td{
   cursor: pointer;
 }
 
-.graph-app .remove-pill:hover{
+.graph-app .remove-pill:hover {
   background: #b33;
 }
 
-.graph-app .pill{
+.graph-app .pill {
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
@@ -1004,31 +1066,31 @@ html[dir="rtl"] .graph-app .info-table td{
   border: 1px solid #ccd;
 }
 
-.graph-app .status-text{
+.graph-app .status-text {
   font-size: 12px;
   color: #4b5563;
   flex: 1;
   text-align: right;
 }
 
-.graph-app[data-theme="dark"] .status-text{
+.graph-app[data-theme="dark"] .status-text {
   color: #d1d9ee;
 }
 
-.graph-app .switch{
+.graph-app .switch {
   position: relative;
   display: inline-block;
   width: 46px;
   height: 24px;
 }
 
-.graph-app .switch input{
+.graph-app .switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.graph-app .slider{
+.graph-app .slider {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -1040,7 +1102,7 @@ html[dir="rtl"] .graph-app .info-table td{
   border-radius: 34px;
 }
 
-.graph-app .slider:before{
+.graph-app .slider:before {
   position: absolute;
   content: "";
   height: 18px;
@@ -1052,27 +1114,28 @@ html[dir="rtl"] .graph-app .info-table td{
   border-radius: 50%;
 }
 
-.graph-app .switch input:checked + .slider{
+.graph-app .switch input:checked + .slider {
   background-color: var(--accent);
 }
 
-.graph-app .switch input:checked + .slider:before{
+.graph-app .switch input:checked + .slider:before {
   transform: translateX(22px);
 }
 
-.graph-app #showGraph, .graph-app #clearGraph{
+.graph-app #showGraph,
+.graph-app #clearGraph {
   display: none;
 }
 
-.graph-app .graph-only{
+.graph-app .graph-only {
   display: none;
 }
 
-.graph-app.graph-ready .graph-only{
+.graph-app.graph-ready .graph-only {
   display: block;
 }
 
-.graph-app #loading-overlay{
+.graph-app #loading-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
@@ -1082,11 +1145,11 @@ html[dir="rtl"] .graph-app .info-table td{
   z-index: 20;
 }
 
-.graph-app #loading-overlay[hidden]{
+.graph-app #loading-overlay[hidden] {
   display: none;
 }
 
-.graph-app .loader{
+.graph-app .loader {
   background: #fff;
   padding: 20px 30px;
   border-radius: 12px;
@@ -1096,13 +1159,114 @@ html[dir="rtl"] .graph-app .info-table td{
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
-.graph-app .spinner{
+.graph-app .spinner {
   width: 32px;
   height: 32px;
   border: 4px solid #e5e7eb;
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.graph-app .legends-panel-section {
+  padding: 0;
+}
+
+.graph-app .legends-table-wrapper {
+  max-height: 340px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.graph-app[data-theme="dark"] .legends-table-wrapper {
+  background: rgba(17, 24, 39, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.graph-app .legends-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.graph-app .legends-table th,
+.graph-app .legends-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.graph-app[data-theme="dark"] .legends-table th,
+.graph-app[data-theme="dark"] .legends-table td {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.graph-app .legends-table thead th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.graph-app[data-theme="dark"] .legends-table thead th {
+  color: #e2e8f0;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.graph-app .legends-table input[type="date"] {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.graph-app[data-theme="dark"] .legends-table input[type="date"] {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+
+.graph-app .legend-color-chip {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  margin-right: 6px;
+}
+
+.graph-app[data-theme="dark"] .legend-color-chip {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.graph-app .legend-date-switch {
+  display: flex;
+  justify-content: center;
+}
+
+.graph-app .legend-date-placeholder {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.graph-app[data-theme="dark"] .legend-date-placeholder {
+  color: #cbd5f5;
+}
+
+.graph-app .legend-empty {
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.graph-app[data-theme="dark"] .legend-empty {
+  color: #e5e7eb;
 }
 
 @keyframes spin {
@@ -1112,7 +1276,7 @@ html[dir="rtl"] .graph-app .info-table td{
 }
 
 @media (max-width: 1200px) {
-  .graph-app #panel-trigger-root{
+  .graph-app #panel-trigger-root {
     position: static;
     transform: none;
     margin: 0 0 12px;
@@ -1120,9 +1284,10 @@ html[dir="rtl"] .graph-app .info-table td{
 
   .graph-app #filter-panel-root,
   .graph-app #settings-panel-root,
+  .graph-app #legends-panel-root,
   .graph-app #info-panel-root,
   .graph-app #path-panel-root,
-  .graph-app #timeline-panel-root{
+  .graph-app #timeline-panel-root {
     position: static;
     width: 100%;
     pointer-events: auto;
@@ -1131,19 +1296,20 @@ html[dir="rtl"] .graph-app .info-table td{
     transform: none;
   }
 
-  .graph-app .filter-panel, .graph-app .filter-panel.collapsed{
+  .graph-app .filter-panel,
+  .graph-app .filter-panel.collapsed {
     transform: none !important;
     opacity: 1;
     width: 100%;
   }
 
-  .graph-app #cy{
+  .graph-app #cy {
     position: relative;
     order: 3;
     min-height: 60vh;
   }
 
-  .graph-app .wrap{
+  .graph-app .wrap {
     display: flex;
     flex-direction: column;
     gap: 16px;

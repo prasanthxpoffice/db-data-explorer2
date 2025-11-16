@@ -1,0 +1,40 @@
+<div class="filter-panel right-panel" id="legendsPanel">
+  <div class="panel-toggle" id="toggleLegends">
+    <h3 data-i18n="legendsTitle">Legends</h3>
+    <button
+      type="button"
+      id="legendsChevron"
+      class="chevron-btn"
+      aria-label="Toggle legends"
+      data-i18n-aria-label="toggleLegendsAria"
+    >
+      v
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-section legends-panel-section">
+      <div
+        id="legendsEmpty"
+        class="legend-empty"
+        data-i18n="legendsPromptSelectViews"
+      >
+        Select at least one view to load legends.
+      </div>
+      <div class="legends-table-wrapper">
+        <table id="legendsTable" class="legends-table" hidden>
+          <thead>
+            <tr>
+          <th data-i18n="legendsTableActive">Active</th>
+          <th data-i18n="legendsTableColor">Color</th>
+          <th data-i18n="legendsTableName">Legend</th>
+          <th data-i18n="legendsTableApplyDate">Apply date filter</th>
+          <th data-i18n="legendsTableFrom">From</th>
+          <th data-i18n="legendsTableTo">To</th>
+        </tr>
+      </thead>
+          <tbody id="legendsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

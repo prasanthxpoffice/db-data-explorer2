@@ -180,6 +180,27 @@
       }
     }
 
+    async function loadLegendsForViews({ onlyActive = true } = {}) {
+      if (!state.viewIds.length) {
+        state.legends = [];
+        return state.legends;
+      }
+      try {
+        setStatus(translate("statusLoadingLegends"));
+        const resp = await callApi("legends", {
+          viewIds: state.viewIds,
+          onlyActive,
+        });
+        state.legends = unwrapData(resp);
+        setStatus(`${translate("statusLegendsLoaded")}: ${state.legends.length}`);
+        return state.legends;
+      } catch (err) {
+        state.legends = [];
+        setStatus(err.message);
+        return state.legends;
+      }
+    }
+
     function renderNodeTypes() {
       if (!els.nodeType) return;
       els.nodeType.innerHTML = state.nodeTypes
@@ -272,6 +293,7 @@
       handleOutsideClick,
       loadViews,
       loadNodeTypesForViews,
+      loadLegendsForViews,
       renderNodeTypes,
       renderItems,
       clearItems,

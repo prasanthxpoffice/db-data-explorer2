@@ -77,6 +77,29 @@ app.MapPost("/node-types", async Task<IResult> (
         });
 });
 
+app.MapPost("/node-legends", async Task<IResult> (
+    [FromBody] LegendsRequest? request,
+    [FromServices] DbOptions options) =>
+{
+    if (!TryPrepareRequest(request, out var lang, out var tvp, out var error))
+    {
+        return error!;
+    }
+
+    var onlyActive = request?.OnlyActive ?? true;
+
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_GetNodeLegends]");
+            command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = lang });
+            command.Parameters.Add(tvp);
+            command.Parameters.Add(new SqlParameter("@OnlyActive", SqlDbType.Bit) { Value = onlyActive });
+            return command;
+        });
+});
+
 app.MapPost("/items", async Task<IResult> (
     [FromBody] ItemsRequest? request,
     [FromServices] DbOptions options) =>
@@ -275,6 +298,8 @@ sealed record DbOptions(string ConnectionString);
 record GraphRequestBase(string Lang, IReadOnlyList<int> ViewIds);
 
 record NodeTypesRequest(string Lang, IReadOnlyList<int> ViewIds) : GraphRequestBase(Lang, ViewIds);
+
+record LegendsRequest(string Lang, IReadOnlyList<int> ViewIds, bool? OnlyActive = true) : GraphRequestBase(Lang, ViewIds);
 
 record ItemsRequest(
     string Lang,

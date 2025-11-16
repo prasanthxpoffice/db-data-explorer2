@@ -19,12 +19,24 @@
         <option value="dark" data-i18n="themeDark">Dark</option>
       </select>
     </div>
-    <div class="panel-section">
-      <label for="autoExpandToggle" data-i18n="autoExpandLabel">Auto expand nodes</label>
-      <label class="switch">
-        <input type="checkbox" id="autoExpandToggle" />
-        <span class="slider"></span>
-      </label>
+    <div class="panel-section auto-expand-row">
+      <div class="auto-expand-toggle-group">
+        <label for="autoExpandToggle" data-i18n="autoExpandLabel">Auto expand nodes</label>
+        <label class="switch">
+          <input type="checkbox" id="autoExpandToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="auto-expand-depth-group">
+        <label for="autoExpandDepth" data-i18n="autoExpandDepthLabel">Depth</label>
+        <select id="autoExpandDepth">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
     </div>
     <div class="panel-section">
       <label for="maxNodes" data-i18n="maxNodesLabel">Max nodes</label>
@@ -68,9 +80,6 @@
         <option value="en" selected>English</option>
         <option value="ar">العربية</option>
       </select>
-    </div>
-    <div class="panel-section info-row">
-      <span id="status" class="status-text"></span>
     </div>
   </div>
 </div>

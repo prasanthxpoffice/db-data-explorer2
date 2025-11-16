@@ -12,6 +12,7 @@
     callApi,
     unwrapData,
     getMaxNodes,
+    getAutoExpandDepth,
     onNodeSelected,
     onEdgeSelected,
     onGraphCleared,
@@ -21,6 +22,8 @@
     const expandedNodes = new Set();
     let autoExpandRunning = false;
     let autoExpandGeneration = 0;
+    let legendFilterFn = null;
+    const autoExpandLevels = new Map();
 
     function cloneElement(el) {
       if (!el || !el.data) return null;
@@ -62,6 +65,68 @@
         default:
           return { sourceArrow: "none", targetArrow: "none" };
       }
+    }
+
+    function isLegendVisible(node) {
+      if (!legendFilterFn || !node) return true;
+      const typeKey = (node.data("type") || "").toLowerCase();
+      return legendFilterFn(typeKey);
+    }
+
+    function applyLegendFilter() {
+      if (!cy) return;
+      cy.batch(() => {
+        cy.nodes().forEach((node) => {
+          const visible = isLegendVisible(node);
+          node.toggleClass("legend-hidden", !visible);
+        });
+        cy.edges().forEach((edge) => {
+          const hide =
+            edge.source().hasClass("legend-hidden") ||
+            edge.target().hasClass("legend-hidden");
+          edge.toggleClass("legend-edge-hidden", hide);
+        });
+      });
+    }
+
+    function setLegendFilter(fn) {
+      legendFilterFn = typeof fn === "function" ? fn : null;
+      applyLegendFilter();
+    }
+
+    function cleanupAutoExpandLevels() {
+      if (!cy) {
+        autoExpandLevels.clear();
+        return;
+      }
+      const validKeys = new Set();
+      cy.nodes().forEach((node) => validKeys.add(node.id()));
+      for (const key of Array.from(autoExpandLevels.keys())) {
+        if (!validKeys.has(key)) {
+          autoExpandLevels.delete(key);
+        }
+      }
+    }
+
+    function seedAutoExpandLevels(force = false) {
+      if (!cy) return;
+      cleanupAutoExpandLevels();
+      cy.nodes().forEach((node) => {
+        if (force || !autoExpandLevels.has(node.id())) {
+          autoExpandLevels.set(node.id(), 0);
+        }
+      });
+    }
+
+    function getAutoExpandDepthLimit() {
+      const raw =
+        typeof getAutoExpandDepth === "function"
+          ? Number.parseInt(getAutoExpandDepth(), 10)
+          : Number.NaN;
+      if (!Number.isFinite(raw)) {
+        return 1;
+      }
+      return Math.min(Math.max(raw, 1), 5);
     }
 
     function nodeIsSeed(node) {
@@ -108,6 +173,7 @@
         window.cy = null;
       }
       expandedNodes.clear();
+      autoExpandLevels.clear();
       autoExpandRunning = false;
       autoExpandGeneration = 0;
       if (onGraphCleared) {
@@ -117,6 +183,8 @@
 
     function resetAutoExpandProgress() {
       expandedNodes.clear();
+      autoExpandLevels.clear();
+      seedAutoExpandLevels(true);
       autoExpandRunning = false;
       autoExpandGeneration++;
       if (els.autoExpandToggle?.checked) {
@@ -142,6 +210,7 @@
         return false;
       }
       const [colId, nodeId] = parsed;
+      const baseDepth = autoExpandLevels.get(sourceKey) ?? 0;
       const rows = await callApi("expand", {
         viewIds: state.viewIds,
         sourceColId: colId,
@@ -166,6 +235,7 @@
 
         const entityLabel = getEntityLabel(displayCol);
         const targetKey = `${displayCol}:${id}`;
+        const nextDepth = baseDepth + 1;
 
         const existingNode = cy.getElementById(targetKey);
         if (existingNode && existingNode.length) {
@@ -182,6 +252,10 @@
             updatedMeta.entityLabel = entityLabel;
             existingNode.data("meta", updatedMeta);
           }
+          const existingDepth = autoExpandLevels.get(targetKey);
+          if (existingDepth === undefined || nextDepth < existingDepth) {
+            autoExpandLevels.set(targetKey, nextDepth);
+          }
         } else {
           nodesToAdd.push({
             data: {
@@ -194,6 +268,7 @@
               meta: { ...row, entityLabel },
             },
           });
+          autoExpandLevels.set(targetKey, nextDepth);
         }
 
         const forwardEdge = cy.$(
@@ -251,6 +326,7 @@
         cy.layout(getLayoutOptions()).run();
       }
       updateLeafVisibility();
+      applyLegendFilter();
 
       if ((nodesToAdd.length || edgesToAdd.length) && onElementsAdded) {
         onElementsAdded({
@@ -269,27 +345,44 @@
       if (!cy) return;
       autoExpandRunning = true;
       try {
-        setStatus(translate("statusAutoExpanding"));
+        seedAutoExpandLevels(false);
         while (
           cy &&
           token === autoExpandGeneration &&
           els.autoExpandToggle?.checked &&
           !(els.stopExpandToggle && els.stopExpandToggle.checked)
         ) {
-          const nextNode = cy
+          const depthLimit = getAutoExpandDepthLimit();
+          const candidates = cy
             .nodes()
             .toArray()
-            .find((n) => !expandedNodes.has(n.id()));
-          if (!nextNode) break;
+            .filter((n) => {
+              const level = autoExpandLevels.get(n.id()) ?? 0;
+              return !expandedNodes.has(n.id()) && level < depthLimit;
+            });
+          const pending = candidates.length;
+          if (!pending) break;
+          const pendingLabel =
+            translate("statusAutoExpandPending") || "Pending";
+          setStatus(
+            `${translate("statusAutoExpanding")} (${pendingLabel}: ${pending})`
+          );
+          const nextNode = candidates[0];
           await appendExpansionResults(nextNode.id(), {
             reason: "autoExpand",
           });
         }
         if (token === autoExpandGeneration) {
+          if (els.autoExpandToggle) {
+            els.autoExpandToggle.checked = false;
+          }
           setStatus(translate("statusAutoExpandComplete"));
         }
       } catch (err) {
         if (token === autoExpandGeneration) {
+          if (els.autoExpandToggle) {
+            els.autoExpandToggle.checked = false;
+          }
           setStatus(err.message);
         }
       } finally {
@@ -304,6 +397,8 @@
       if (els.stopExpandToggle?.checked) return;
       if (!cy) return;
       if (autoExpandRunning && !force) return;
+
+      seedAutoExpandLevels(false);
 
       if (force) {
         autoExpandGeneration++;
@@ -443,6 +538,7 @@
             "font-size": 12,
           },
         },
+        { selector: "node.legend-hidden", style: { display: "none" } },
         {
           selector: "node.path-node",
           style: {
@@ -474,6 +570,7 @@
             "text-outline-width": palette.edgeOutlineWidth,
           },
         },
+        { selector: "edge.legend-edge-hidden", style: { display: "none" } },
         {
           selector: "edge.path-base-edge",
           style: {
@@ -511,6 +608,7 @@
       if (!cy) return;
       cy.style(buildStyle());
       updateLeafVisibility();
+      applyLegendFilter();
     }
 
     function replaceElements(
@@ -535,6 +633,12 @@
           cy.resize();
         }
         updateLeafVisibility();
+        applyLegendFilter();
+        autoExpandLevels.clear();
+        seedAutoExpandLevels(true);
+        if (els.autoExpandToggle?.checked) {
+          queueAutoExpand(true);
+        }
       }
       if (resetState) {
         expandedNodes.clear();
@@ -617,6 +721,12 @@
       });
 
       updateLeafVisibility();
+      applyLegendFilter();
+      autoExpandLevels.clear();
+      seedAutoExpandLevels(true);
+      if (els.autoExpandToggle?.checked) {
+        queueAutoExpand(true);
+      }
     }
 
     return {
@@ -630,6 +740,8 @@
       deriveArrows,
       runLayout,
       refreshStyle,
+      setLegendFilter,
+      applyLegendFilter,
     };
   };
 })(window);

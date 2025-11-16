@@ -3,13 +3,16 @@ window.APP_CONFIG = {
   api: {
     views: { path: "/views", method: "GET" },
     nodeTypes: { path: "/node-types", method: "POST" },
+    legends: { path: "/node-legends", method: "POST" },
     items: { path: "/items", method: "POST" },
-    expand: { path: "/expand", method: "POST" }
+    expand: { path: "/expand", method: "POST" },
   },
   defaults: {
     maxItems: 20,
-    maxNodes: 200
+    maxNodes: 200,
+    autoExpandDepth: 1,
   },
   defaultLang: "en",
-  userId: "demo-user"
+  showLanguageSelector: true,
+  userId: "demo-user",
 };

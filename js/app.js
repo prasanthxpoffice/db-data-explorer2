@@ -118,6 +118,7 @@ function initApp() {
     allowNodeExpand: APP_CONFIG.defaults?.allowNodeExpand ?? true,
     hideLeaves: APP_CONFIG.defaults?.hideLeaves ?? false,
     theme: APP_CONFIG.defaults?.theme ?? "light",
+    autoExpandDepth: APP_CONFIG.defaults?.autoExpandDepth ?? 1,
   };
 
   const dateDefaults = {
@@ -132,9 +133,15 @@ function initApp() {
     viewIds: [],
     nodeTypes: [],
     items: [],
+    legends: [],
+    legendControls: Object.create(null),
+    lastLegendsViewKey: "",
     selected: [],
     activeItem: null,
     theme: defaults.theme,
+    autoExpandDepth: defaults.autoExpandDepth,
+    showLanguageSelector:
+      APP_CONFIG.showLanguageSelector !== false,
   };
   const translations = window.TRANSLATIONS || {};
   const ensureTranslations = (lang, entries) => {
@@ -203,6 +210,12 @@ function initApp() {
     configPanel: document.getElementById("configPanel"),
     toggleConfig: document.getElementById("toggleConfig"),
     configChevron: document.getElementById("configChevron"),
+    legendsPanel: document.getElementById("legendsPanel"),
+    toggleLegends: document.getElementById("toggleLegends"),
+    legendsChevron: document.getElementById("legendsChevron"),
+    legendsTable: document.getElementById("legendsTable"),
+    legendsTableBody: document.getElementById("legendsTableBody"),
+    legendsEmpty: document.getElementById("legendsEmpty"),
     pathPanel: document.getElementById("pathPanel"),
     togglePath: document.getElementById("togglePath"),
     pathChevron: document.getElementById("pathChevron"),
@@ -227,6 +240,7 @@ function initApp() {
     stopExpandToggle: document.getElementById("stopExpandToggle"),
     hideLeavesToggle: document.getElementById("hideLeavesToggle"),
     autoExpandToggle: document.getElementById("autoExpandToggle"),
+    autoExpandDepth: document.getElementById("autoExpandDepth"),
     themeSelect: document.getElementById("themeSelect"),
     exportPng: document.getElementById("exportPng"),
     loadingOverlay: document.getElementById("loading-overlay"),
@@ -236,6 +250,7 @@ function initApp() {
   const floatingPanels = {
     filters: document.getElementById("filter-panel-root"),
     settings: document.getElementById("settings-panel-root"),
+    legends: document.getElementById("legends-panel-root"),
     info: document.getElementById("info-panel-root"),
     path: document.getElementById("path-panel-root"),
     timeline: document.getElementById("timeline-panel-root"),
@@ -343,6 +358,18 @@ function initApp() {
 
   if (els.language) {
     els.language.value = state.language;
+    const languageSection = els.language.closest(".panel-section");
+    const hidden = state.showLanguageSelector === false;
+    if (languageSection) {
+      languageSection.classList.toggle("hidden", hidden);
+    }
+    if (hidden) {
+      els.language.setAttribute("aria-hidden", "true");
+      els.language.setAttribute("tabindex", "-1");
+    } else {
+      els.language.removeAttribute("aria-hidden");
+      els.language.removeAttribute("tabindex");
+    }
   }
   if (els.maxNodes) {
     els.maxNodes.value = defaults.maxNodes;
@@ -361,6 +388,9 @@ function initApp() {
   }
   if (els.autoExpandToggle) {
     els.autoExpandToggle.checked = false;
+  }
+  if (els.autoExpandDepth) {
+    els.autoExpandDepth.value = `${state.autoExpandDepth}`;
   }
   if (els.themeSelect) {
     els.themeSelect.value = defaults.theme;
@@ -391,6 +421,7 @@ function initApp() {
     callApi: data.callApi,
     unwrapData: data.unwrapData,
     getMaxNodes,
+    getAutoExpandDepth: () => state.autoExpandDepth,
     onNodeSelected: handleNodeSelection,
     onEdgeSelected: infoPanel.renderEdgeInfo,
     onGraphCleared: infoPanel.reset,
@@ -471,6 +502,7 @@ function initApp() {
     applyDomTranslations();
     data.updateViewIndicator();
     renderSelections();
+    renderLegendsPanel();
     pathModule?.onLanguageChanged?.();
     timelineModule?.refreshTranslations?.();
   }
@@ -485,6 +517,12 @@ function initApp() {
     panel: els.configPanel,
     toggleButton: els.toggleConfig,
     chevron: els.configChevron,
+    onToggle: updateGraphPadding,
+  });
+  initCollapsiblePanel({
+    panel: els.legendsPanel,
+    toggleButton: els.toggleLegends,
+    chevron: els.legendsChevron,
     onToggle: updateGraphPadding,
   });
   initCollapsiblePanel({
@@ -533,6 +571,194 @@ function initApp() {
     }
   }
 
+  const legendKey = (value) => (value || "").trim().toLowerCase();
+
+  const isLegendKeyActive = (key) => {
+    if (!key) return true;
+    const controls = state.legendControls[key];
+    if (!controls) return true;
+    return controls.active !== false;
+  };
+
+  const applyLegendFiltersToGraph = () => {
+    if (typeof graph.applyLegendFilter === "function") {
+      graph.applyLegendFilter();
+    }
+  };
+
+  if (typeof graph.setLegendFilter === "function") {
+    graph.setLegendFilter((key) => isLegendKeyActive(key));
+  }
+  const buildLegendsViewKey = () =>
+    state.viewIds.length
+      ? state.viewIds
+          .slice()
+          .map((id) => Number(id) || 0)
+          .sort((a, b) => a - b)
+          .join(",")
+      : "";
+
+  function ensureLegendControlByKey(key) {
+    if (!key) return null;
+    const existing = state.legendControls[key];
+    if (existing) {
+      if (!("active" in existing)) {
+        existing.active = true;
+      }
+      if (!existing.fromDate) {
+        existing.fromDate = dateDefaults.from;
+      }
+      if (!existing.toDate) {
+        existing.toDate = dateDefaults.to;
+      }
+      if (!("useDateFilter" in existing)) {
+        existing.useDateFilter = false;
+      }
+      return existing;
+    }
+    const next = {
+      active: true,
+      fromDate: dateDefaults.from,
+      toDate: dateDefaults.to,
+      useDateFilter: false,
+    };
+    state.legendControls[key] = next;
+    return next;
+  }
+
+  function ensureLegendControl(colId) {
+    return ensureLegendControlByKey(legendKey(colId));
+  }
+
+  function renderLegendsPanel() {
+    if (!els.legendsTable || !els.legendsTableBody || !els.legendsEmpty) {
+      return;
+    }
+
+    const hasViews = state.viewIds.length > 0;
+    const activeKeys = new Set();
+    state.legends.forEach((legend) => {
+      const colId = `${legend.colId ?? legend.ColId ?? ""}`.trim();
+      const key = legendKey(colId);
+      if (key) {
+        activeKeys.add(key);
+      }
+    });
+
+    Object.keys(state.legendControls).forEach((key) => {
+      if (!activeKeys.has(key)) {
+        delete state.legendControls[key];
+      }
+    });
+
+    if (!hasViews) {
+      els.legendsTable.hidden = true;
+      els.legendsEmpty.hidden = false;
+      els.legendsEmpty.textContent = translate("legendsPromptSelectViews");
+      els.legendsTableBody.innerHTML = "";
+      applyLegendFiltersToGraph();
+      return;
+    }
+
+    if (!state.legends.length) {
+      els.legendsTable.hidden = true;
+      els.legendsEmpty.hidden = false;
+      els.legendsEmpty.textContent = translate("legendsEmptyMessage");
+      els.legendsTableBody.innerHTML = "";
+      applyLegendFiltersToGraph();
+      return;
+    }
+
+    els.legendsEmpty.hidden = true;
+    els.legendsTable.hidden = false;
+    const rows = state.legends
+      .map((legend) => {
+        const colId = `${legend.colId ?? legend.ColId ?? ""}`.trim();
+        if (!colId) return "";
+        const label = legend.label ?? legend.Label ?? colId;
+        const color =
+          legend.color ?? legend.Color ?? DEFAULT_NODE_COLOR;
+        const key = legendKey(colId);
+        const controls = ensureLegendControlByKey(key);
+        if (!key || !controls) {
+          return "";
+        }
+        const checkedAttr = controls.active === false ? "" : "checked";
+        const fromDate = controls.fromDate || "";
+        const toDate = controls.toDate || "";
+        const ariaLabel = escapeHtml(translate("legendsActiveAria"));
+        const dateToggleLabel = escapeHtml(
+          translate("legendsDateToggleAria", "Toggle date filter")
+        );
+        const showDates = controls.useDateFilter === true;
+        const dateToggle = `
+          <label class="switch legend-date-switch">
+            <input
+              type="checkbox"
+              data-role="legend-date-toggle"
+              ${showDates ? "checked" : ""}
+              aria-label="${dateToggleLabel}"
+            />
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        `;
+        const fromContent = showDates
+          ? `<input
+                type="date"
+                data-role="legend-from"
+                value="${escapeHtml(fromDate)}"
+              />`
+          : `<span class="legend-date-placeholder">&mdash;</span>`;
+        const toContent = showDates
+          ? `<input
+                type="date"
+                data-role="legend-to"
+                value="${escapeHtml(toDate)}"
+              />`
+          : `<span class="legend-date-placeholder">&mdash;</span>`;
+        const colorValue = escapeHtml(color);
+        return `
+          <tr data-legend-key="${escapeHtml(key)}">
+            <td>
+              <input
+                type="checkbox"
+                data-role="legend-active"
+                ${checkedAttr}
+                aria-label="${ariaLabel}"
+              />
+            </td>
+            <td>
+              <span class="legend-color-chip" style="background-color: ${colorValue};" aria-label="${colorValue}" title="${colorValue}"></span>
+            </td>
+            <td>${escapeHtml(label)}</td>
+            <td>${dateToggle}</td>
+            <td>${fromContent}</td>
+            <td>${toContent}</td>
+          </tr>
+        `;
+      })
+      .filter(Boolean)
+      .join("");
+    els.legendsTableBody.innerHTML = rows;
+    applyLegendFiltersToGraph();
+  }
+
+  async function refreshLegendsPanel(options = {}) {
+    if (!state.viewIds.length) {
+      state.legends = [];
+      state.lastLegendsViewKey = "";
+      renderLegendsPanel();
+      return;
+    }
+    const nextKey = buildLegendsViewKey();
+    if (!options.force && state.lastLegendsViewKey === nextKey) {
+      return;
+    }
+    await data.loadLegendsForViews(options);
+    state.lastLegendsViewKey = nextKey;
+    renderLegendsPanel();
+  }
+
   const graphPanelButtons = Array.from(
     document.querySelectorAll(".panel-trigger.graph-panel")
   );
@@ -566,11 +792,18 @@ function initApp() {
     // Panels are absolutely positioned; graph already full screen.
   }
 
-  els.language?.addEventListener("change", () => {
+  els.language?.addEventListener("change", async () => {
+    if (state.showLanguageSelector === false) {
+      if (els.language) {
+        els.language.value = state.language;
+      }
+      return;
+    }
     state.language = els.language.value;
     applyLanguageChrome();
     data.clearItems(true);
-    data.loadViews();
+    await data.loadViews();
+    await refreshLegendsPanel({ force: true });
     infoPanel.reset();
   });
 
@@ -682,7 +915,42 @@ function initApp() {
       graph.resetAutoExpandProgress();
       pathModule?.onGraphCleared?.();
     }
+    refreshLegendsPanel();
   });
+
+  const handleLegendControlsChange = (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    const row = target.closest("tr[data-legend-key]");
+    if (!row) return;
+    const key = legendKey(row.dataset.legendKey || "");
+    const controls = ensureLegendControlByKey(key);
+    if (!controls) {
+      return;
+    }
+    const role = target.dataset.role;
+    let rerender = false;
+    if (role === "legend-active") {
+      controls.active = target.checked;
+    } else if (role === "legend-date-toggle") {
+      controls.useDateFilter = target.checked;
+      rerender = true;
+    } else if (role === "legend-from") {
+      controls.fromDate = target.value;
+    } else if (role === "legend-to") {
+      controls.toDate = target.value;
+    }
+    if (rerender) {
+      renderLegendsPanel();
+    } else {
+      applyLegendFiltersToGraph();
+    }
+  };
+
+  els.legendsTableBody?.addEventListener("change", handleLegendControlsChange);
+  els.legendsTableBody?.addEventListener("input", handleLegendControlsChange);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -810,6 +1078,18 @@ function initApp() {
 
   els.autoExpandToggle?.addEventListener("change", () => {
     if (els.autoExpandToggle.checked) {
+      graph.resetAutoExpandProgress();
+    }
+  });
+
+  els.autoExpandDepth?.addEventListener("change", () => {
+    const raw = parseInt(els.autoExpandDepth.value, 10);
+    const normalized = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 5) : 1;
+    state.autoExpandDepth = normalized;
+    if (els.autoExpandDepth.value !== `${normalized}`) {
+      els.autoExpandDepth.value = `${normalized}`;
+    }
+    if (els.autoExpandToggle?.checked) {
       graph.resetAutoExpandProgress();
     }
   });
@@ -978,7 +1258,9 @@ function initApp() {
 
   applyLanguageChrome();
   renderSelections();
-  data.loadViews();
+  data.loadViews().then(() => {
+    refreshLegendsPanel();
+  });
   updateGraphPadding();
 }
 
