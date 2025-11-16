@@ -14,5 +14,6 @@ window.APP_CONFIG = {
   },
   defaultLang: "en",
   showLanguageSelector: true,
+  showTimelineButton: false,
   userId: "demo-user",
 };

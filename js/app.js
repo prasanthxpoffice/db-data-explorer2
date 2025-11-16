@@ -142,6 +142,7 @@ function initApp() {
     autoExpandDepth: defaults.autoExpandDepth,
     showLanguageSelector:
       APP_CONFIG.showLanguageSelector !== false,
+    showTimelineButton: APP_CONFIG.showTimelineButton !== false,
   };
   const translations = window.TRANSLATIONS || {};
   const ensureTranslations = (lang, entries) => {
@@ -766,6 +767,10 @@ function initApp() {
 
   function updateTopPanelVisibility(hasGraph) {
     graphPanelButtons.forEach((btn) => {
+      if (btn.classList.contains("timeline-trigger") && state.showTimelineButton === false) {
+        btn.style.display = "none";
+        return;
+      }
       btn.style.display = hasGraph ? "" : "none";
     });
     if (!hasGraph && activeFloatingPanel && ["info", "path", "timeline"].includes(activeFloatingPanel)) {
