@@ -245,6 +245,19 @@ function initApp() {
     themeSelect: document.getElementById("themeSelect"),
     exportPng: document.getElementById("exportPng"),
     loadingOverlay: document.getElementById("loading-overlay"),
+    masterSettingsButton: document.getElementById("masterSettingsButton"),
+    masterSettingsOverlay: document.getElementById("masterSettingsOverlay"),
+    masterSettingsClose: document.getElementById("masterSettingsClose"),
+    masterSettingsDialog: document.querySelector(".master-settings-dialog"),
+    masterSettingsLegendsBody: document.getElementById("masterSettingsLegendsBody"),
+    masterSettingsLegendsStatus: document.getElementById("masterSettingsLegendsStatus"),
+    masterSettingsLegendsEmpty: document.getElementById("masterSettingsLegendsEmpty"),
+    masterSettingsLegendsRefresh: document.getElementById("masterSettingsLegendsRefresh"),
+    masterSettingsRelationsBody: document.getElementById("masterSettingsRelationsBody"),
+    masterSettingsRelationsStatus: document.getElementById("masterSettingsRelationsStatus"),
+    masterSettingsRelationsEmpty: document.getElementById("masterSettingsRelationsEmpty"),
+    masterSettingsRelationsRefresh: document.getElementById("masterSettingsRelationsRefresh"),
+    masterSettingsRelationsAdd: document.getElementById("masterSettingsRelationsAdd"),
     root: rootEl,
   };
 
@@ -468,6 +481,767 @@ function initApp() {
         pathModule?.onGraphCleared?.();
       },
     }) || null;
+
+  const masterSettingsTabs = Array.from(
+    document.querySelectorAll(".master-settings-tab")
+  );
+  const masterSettingsPanels = Array.from(
+    document.querySelectorAll(".master-settings-panel")
+  );
+  const masterSettingsState = {
+    legends: [],
+    legendsLoaded: false,
+    legendsLoading: false,
+  };
+  let masterSettingsLegendsPromise = null;
+  const masterSettingsRelationsState = {
+    relations: [],
+    loaded: false,
+    loading: false,
+  };
+  const DIRECTION_OPTIONS = ["->", "<-", "<->"];
+  const HEX_COLOR_REGEX = /^#([0-9a-f]{6})$/i;
+  const HEX_COLOR_SHORT_REGEX = /^#([0-9a-f]{3})$/i;
+
+  function normalizeLegendColor(value) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (HEX_COLOR_REGEX.test(trimmed)) {
+        return trimmed;
+      }
+      const short = HEX_COLOR_SHORT_REGEX.exec(trimmed);
+      if (short) {
+        const [r, g, b] = short[1].split("");
+        return `#${r}${r}${g}${g}${b}${b}`;
+      }
+    }
+    return DEFAULT_NODE_COLOR;
+  }
+
+  function setMasterSettingsLegendsStatus(message, isError = false) {
+    if (!els.masterSettingsLegendsStatus) return;
+    els.masterSettingsLegendsStatus.textContent = message;
+    els.masterSettingsLegendsStatus.classList.toggle("error", isError);
+  }
+
+  function refreshMasterSettingsLegendsSummary() {
+    if (masterSettingsState.legendsLoading) {
+      setMasterSettingsLegendsStatus(translate("masterSettingsLegendsLoading"));
+      return;
+    }
+    if (!masterSettingsState.legendsLoaded) {
+      setMasterSettingsLegendsStatus(
+        translate("masterSettingsLegendsStatusIdle")
+      );
+      return;
+    }
+    if (masterSettingsState.legends.length) {
+      setMasterSettingsLegendsStatus(
+        `${masterSettingsState.legends.length} ${translate("legendsTitle")}`
+      );
+    } else {
+      setMasterSettingsLegendsStatus(
+        translate("masterSettingsLegendsEmpty")
+      );
+    }
+  }
+
+  function getRecordField(item, ...keys) {
+    if (!item) return "";
+    for (const key of keys) {
+      if (key in item && item[key] !== undefined && item[key] !== null) {
+        return item[key];
+      }
+      const lower = key.toLowerCase();
+      if (lower in item && item[lower] !== undefined && item[lower] !== null) {
+        return item[lower];
+      }
+    }
+    return "";
+  }
+
+  function toBoolean(value) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const trimmed = value.trim().toLowerCase();
+      return trimmed === "1" || trimmed === "true" || trimmed === "yes";
+    }
+    return false;
+  }
+
+  function getNodeDisplayLabel(node) {
+    const id = `${getRecordField(node, "Column_ID", "ColumnId")}`.trim();
+    if (!id) return "";
+    const en = getRecordField(node, "ColumnEn", "columnEn");
+    const ar = getRecordField(node, "ColumnAr", "columnAr");
+    const preferArabic = state.language === "ar";
+    const label = preferArabic ? ar || en || id : en || ar || id;
+    return label && label !== id ? `${label} (${id})` : id;
+  }
+
+  function buildNodeOptions(selectedId) {
+    const selected = (selectedId || "").trim();
+    const selectedLower = selected.toLowerCase();
+    const placeholder = `<option value="">${escapeHtml(
+      translate("masterSettingsRelationsSelectColumn")
+    )}</option>`;
+    let hasSelectedOption = false;
+    const options = masterSettingsState.legends
+      .map((node) => {
+        const id = `${getRecordField(node, "Column_ID", "ColumnId")}`.trim();
+        if (!id) return "";
+        const label = getNodeDisplayLabel(node);
+        const isSelected = !!selected && id.toLowerCase() === selectedLower;
+        if (isSelected) {
+          hasSelectedOption = true;
+        }
+        return `<option value="${escapeHtml(id)}" ${
+          isSelected ? "selected" : ""
+        }>${escapeHtml(label)}</option>`;
+      })
+      .filter(Boolean);
+    if (selected && !hasSelectedOption) {
+      options.unshift(
+        `<option value="${escapeHtml(selected)}" selected>${escapeHtml(
+          selected
+        )}</option>`
+      );
+    }
+    return [placeholder, ...options].join("");
+  }
+
+  function buildNodeSelect(name, selectedId) {
+    return `<select name="${name}">${buildNodeOptions(selectedId)}</select>`;
+  }
+  function renderMasterSettingsLegends() {
+    if (!els.masterSettingsLegendsBody) return;
+    const rows = masterSettingsState.legends
+      .map((legend) => {
+        const columnId = `${getRecordField(
+          legend,
+          "Column_ID",
+          "ColumnId",
+          "column_id",
+          "columnId"
+        )}`.trim();
+        if (!columnId) {
+          return "";
+        }
+        const columnEn = getRecordField(legend, "ColumnEn", "columnEn");
+        const columnAr = getRecordField(legend, "ColumnAr", "columnAr");
+        const color = normalizeLegendColor(
+          getRecordField(legend, "ColumnColor", "columnColor")
+        );
+        const isActive = toBoolean(getRecordField(legend, "IsActive", "isActive"));
+        const updateLabel = translate("masterSettingsLegendsUpdate");
+        return `
+          <tr class="master-settings-legends-row" data-column-id="${escapeHtml(
+            columnId
+          )}">
+            <td><code>${escapeHtml(columnId)}</code></td>
+            <td>
+              <input type="text" name="columnEn" value="${escapeHtml(
+                columnEn || ""
+              )}" />
+            </td>
+            <td>
+              <input type="text" name="columnAr" value="${escapeHtml(
+                columnAr || ""
+              )}" />
+            </td>
+            <td class="color-cell">
+              <input type="color" name="columnColor" value="${color}" />
+            </td>
+            <td class="checkbox-cell">
+              <input type="checkbox" name="isActive" ${
+                isActive ? "checked" : ""
+              } aria-label="${translate("masterSettingsLegendActive")}" />
+            </td>
+            <td class="actions-cell">
+              <button type="button" data-action="save">${escapeHtml(
+                updateLabel
+              )}</button>
+            </td>
+          </tr>
+        `;
+      })
+      .filter(Boolean);
+
+    if (!rows.length) {
+      els.masterSettingsLegendsBody.innerHTML = `<tr><td colspan="6">${escapeHtml(
+        translate("masterSettingsLegendsEmpty")
+      )}</td></tr>`;
+      if (els.masterSettingsLegendsEmpty) {
+        els.masterSettingsLegendsEmpty.hidden = false;
+      }
+      return;
+    }
+
+    els.masterSettingsLegendsBody.innerHTML = rows.join("");
+    if (els.masterSettingsLegendsEmpty) {
+      els.masterSettingsLegendsEmpty.hidden = true;
+    }
+  }
+
+  async function loadMasterSettingsLegends(force = false) {
+    if (!els.masterSettingsLegendsBody) return;
+    if (!force && masterSettingsState.legendsLoaded) return;
+    if (masterSettingsState.legendsLoading) {
+      await masterSettingsLegendsPromise;
+      if (!force || masterSettingsState.legendsLoaded) {
+        return;
+      }
+    }
+    masterSettingsState.legendsLoading = true;
+    setMasterSettingsLegendsStatus(translate("masterSettingsLegendsLoading"));
+    const request = (async () => {
+      try {
+        const response = await data.callApi("masterNodes");
+        const payload = data.unwrapData(response);
+        masterSettingsState.legends = Array.isArray(payload) ? payload : [];
+        masterSettingsState.legendsLoaded = true;
+        renderMasterSettingsLegends();
+        renderMasterSettingsRelations();
+        refreshMasterSettingsLegendsSummary();
+      } catch (err) {
+        setMasterSettingsLegendsStatus(err.message, true);
+      } finally {
+        masterSettingsState.legendsLoading = false;
+        masterSettingsLegendsPromise = null;
+      }
+    })();
+    masterSettingsLegendsPromise = request;
+    await request;
+  }
+
+  function collectLegendRowData(row) {
+    if (!row) return null;
+    const columnId = row.dataset.columnId;
+    if (!columnId) return null;
+    const columnEn = row.querySelector('input[name="columnEn"]')?.value ?? "";
+    const columnAr = row.querySelector('input[name="columnAr"]')?.value ?? "";
+    const columnColor =
+      row.querySelector('input[name="columnColor"]')?.value ?? DEFAULT_NODE_COLOR;
+    const isActive = row.querySelector('input[name="isActive"]')?.checked ?? false;
+    return {
+      Column_ID: columnId,
+      ColumnEn: columnEn,
+      ColumnAr: columnAr,
+      ColumnColor: columnColor,
+      IsActive: isActive,
+    };
+  }
+
+  function updateLegendState(columnId, patch) {
+    const target = masterSettingsState.legends.find((legend) => {
+      const id = `${getRecordField(
+        legend,
+        "Column_ID",
+        "ColumnId",
+        "column_id",
+        "columnId"
+      )}`.trim();
+      return id === columnId;
+    });
+    if (!target) return;
+    Object.assign(target, patch);
+    renderMasterSettingsRelations();
+  }
+
+  async function saveLegendRow(row, button) {
+    const payload = collectLegendRowData(row);
+    if (!payload) return;
+    row.classList.add("saving");
+    row.classList.remove("error");
+    button.disabled = true;
+    setMasterSettingsLegendsStatus(translate("masterSettingsLegendsLoading"));
+    try {
+      await data.callApi("updateMasterNode", payload);
+      updateLegendState(payload.Column_ID, payload);
+      row.classList.remove("dirty");
+      setMasterSettingsLegendsStatus(translate("masterSettingsLegendsUpdated"));
+    } catch (err) {
+      row.classList.add("error");
+      setMasterSettingsLegendsStatus(err.message, true);
+    } finally {
+      row.classList.remove("saving");
+      button.disabled = false;
+    }
+  }
+
+  function markLegendRowDirty(event) {
+    if (!(event.target instanceof Element)) return;
+    const row = event.target.closest(".master-settings-legends-row");
+    if (!row) return;
+    row.classList.add("dirty");
+  }
+
+  const setMasterSettingsTab = (tabName) => {
+    if (!masterSettingsTabs.length) return;
+    const targetTab =
+      tabName ||
+      masterSettingsTabs.find((tab) => tab.classList.contains("active"))
+        ?.dataset.masterTab ||
+      masterSettingsTabs[0]?.dataset.masterTab;
+    if (!targetTab) return;
+    masterSettingsTabs.forEach((tab) => {
+      const isActive = tab.dataset.masterTab === targetTab;
+      tab.classList.toggle("active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+      tab.setAttribute("tabindex", isActive ? "0" : "-1");
+    });
+    masterSettingsPanels.forEach((panel) => {
+      const isActive = panel.dataset.masterPanel === targetTab;
+      panel.classList.toggle("active", isActive);
+      panel.hidden = !isActive;
+    });
+    if (els.masterSettingsDialog) {
+      const isEntities = targetTab === "entities";
+      els.masterSettingsDialog.classList.toggle("wide", isEntities);
+    }
+    if (targetTab === "legends") {
+      loadMasterSettingsLegends();
+    } else if (targetTab === "entities") {
+      loadMasterSettingsLegends();
+      loadMasterSettingsRelations();
+    }
+  };
+
+  const openMasterSettings = () => {
+    if (!els.masterSettingsOverlay) return;
+    setMasterSettingsTab();
+    els.masterSettingsOverlay.classList.add("open");
+    els.masterSettingsOverlay.setAttribute("aria-hidden", "false");
+  };
+
+  const closeMasterSettings = () => {
+    if (!els.masterSettingsOverlay) return;
+    els.masterSettingsOverlay.classList.remove("open");
+    els.masterSettingsOverlay.setAttribute("aria-hidden", "true");
+  };
+
+  els.masterSettingsButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    openMasterSettings();
+  });
+
+  els.masterSettingsClose?.addEventListener("click", () => {
+    closeMasterSettings();
+  });
+
+  els.masterSettingsOverlay?.addEventListener("click", (event) => {
+    if (event.target === els.masterSettingsOverlay) {
+      closeMasterSettings();
+    }
+  });
+
+  masterSettingsTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      setMasterSettingsTab(tab.dataset.masterTab);
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      els.masterSettingsOverlay?.classList.contains("open")
+    ) {
+      closeMasterSettings();
+    }
+  });
+
+  els.masterSettingsLegendsRefresh?.addEventListener("click", () => {
+    loadMasterSettingsLegends(true);
+  });
+
+  els.masterSettingsLegendsBody?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest("button[data-action='save']");
+    if (!button) return;
+    const row = button.closest(".master-settings-legends-row");
+    if (!row) return;
+    saveLegendRow(row, button);
+  });
+
+  els.masterSettingsLegendsBody?.addEventListener("input", markLegendRowDirty);
+  els.masterSettingsLegendsBody?.addEventListener("change", markLegendRowDirty);
+
+  function setMasterSettingsRelationsStatus(message, isError = false) {
+    if (!els.masterSettingsRelationsStatus) return;
+    els.masterSettingsRelationsStatus.textContent = message;
+    els.masterSettingsRelationsStatus.classList.toggle("error", isError);
+  }
+
+  function refreshMasterSettingsRelationsSummary() {
+    if (masterSettingsRelationsState.loading) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsLoading")
+      );
+      return;
+    }
+    if (!masterSettingsRelationsState.loaded) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsStatusIdle")
+      );
+      return;
+    }
+    if (masterSettingsRelationsState.relations.length) {
+      setMasterSettingsRelationsStatus(
+        `${masterSettingsRelationsState.relations.length} ${translate(
+          "masterSettingsRelationsHeading"
+        )}`
+      );
+    } else {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsEmpty")
+      );
+    }
+  }
+
+  function renderMasterSettingsRelations() {
+    if (!els.masterSettingsRelationsBody) return;
+    if (
+      !masterSettingsRelationsState.loaded &&
+      !masterSettingsRelationsState.relations.length
+    ) {
+      return;
+    }
+    const rows = masterSettingsRelationsState.relations.map((relation, index) => {
+      const relationIdRaw = `${getRecordField(relation, "RelationID", "relationId")}`.trim();
+      const relationId = parseInt(relationIdRaw, 10);
+      const relationIdDisplay = Number.isFinite(relationId) ? relationId : "";
+      const sourceId = `${getRecordField(relation, "Source_Column_ID", "sourceColumnId")}`.trim();
+      const searchId = `${getRecordField(relation, "Search_Column_ID", "searchColumnId")}`.trim();
+      const displayId = `${getRecordField(relation, "Display_Column_ID", "displayColumnId")}`.trim();
+      const direction = `${getRecordField(relation, "Direction", "direction")}`.trim();
+      const relationColumn = `${getRecordField(relation, "Relation_Column_ID", "relationColumnId")}`.trim();
+      const relationEn = `${getRecordField(relation, "RelationEn", "relationEn")}`.trim();
+      const relationAr = `${getRecordField(relation, "RelationAr", "relationAr")}`.trim();
+      const isNew = !!relation.__isNew;
+      const rowClasses = ["master-settings-relations-row"];
+      if (isNew) {
+        rowClasses.push("new");
+      }
+      const fallbackRowId =
+        sourceId && searchId && displayId ? `${sourceId}|${searchId}|${displayId}` : `new-${index}`;
+      if (!relation.__key && !Number.isFinite(relationId)) {
+        relation.__key = fallbackRowId;
+      }
+      const rowKey =
+        Number.isFinite(relationId) && relationId > 0
+          ? `id-${relationId}`
+          : relation.__key || fallbackRowId;
+      const saveLabel = translate("masterSettingsRelationsSave");
+      const deleteLabel = translate("masterSettingsRelationsDelete");
+      const directionOptions = [
+        `<option value="">${escapeHtml(
+          translate("masterSettingsRelationsDirectionPlaceholder")
+        )}</option>`,
+        ...DIRECTION_OPTIONS.map(
+          (opt) =>
+            `<option value="${opt}" ${
+              opt === direction ? "selected" : ""
+            }>${opt}</option>`
+        ),
+      ].join("");
+      const deleteButton =
+        Number.isFinite(relationId) && relationId > 0
+          ? `<button type="button" class="danger" data-action="delete">${escapeHtml(
+              deleteLabel
+            )}</button>`
+          : "";
+      return `
+        <tr class="${rowClasses.join(" ")}" data-row-id="${escapeHtml(
+          rowKey
+        )}" data-relation-id="${Number.isFinite(relationId) ? relationId : ""}" data-new-row="${isNew ? "true" : "false"}">
+          <td>${relationIdDisplay ? `<code>${relationIdDisplay}</code>` : "&mdash;"}</td>
+          <td>
+            ${buildNodeSelect("sourceColumnId", sourceId)}
+          </td>
+          <td>
+            ${buildNodeSelect("searchColumnId", searchId)}
+          </td>
+          <td>
+            ${buildNodeSelect("displayColumnId", displayId)}
+          </td>
+          <td>
+            <select name="direction">
+              ${directionOptions}
+            </select>
+          </td>
+          <td>
+            ${buildNodeSelect("relationColumnId", relationColumn)}
+          </td>
+          <td>
+            <input type="text" name="relationEn" value="${escapeHtml(
+              relationEn
+            )}" />
+          </td>
+          <td>
+            <input type="text" name="relationAr" value="${escapeHtml(
+              relationAr
+            )}" />
+          </td>
+          <td class="actions-cell">
+            <button type="button" data-action="save">${escapeHtml(
+              saveLabel
+            )}</button>
+            ${deleteButton}
+          </td>
+        </tr>
+      `;
+    });
+
+    if (!rows.length) {
+      els.masterSettingsRelationsBody.innerHTML = `<tr><td colspan="8">${escapeHtml(
+        translate("masterSettingsRelationsEmpty")
+      )}</td></tr>`;
+      if (els.masterSettingsRelationsEmpty) {
+        els.masterSettingsRelationsEmpty.hidden = false;
+      }
+      return;
+    }
+
+    els.masterSettingsRelationsBody.innerHTML = rows.join("");
+    if (els.masterSettingsRelationsEmpty) {
+      els.masterSettingsRelationsEmpty.hidden = true;
+    }
+  }
+
+  async function loadMasterSettingsRelations(force = false) {
+    if (!els.masterSettingsRelationsBody) return;
+    if (masterSettingsRelationsState.loading) return;
+    if (!force && masterSettingsRelationsState.loaded) return;
+    masterSettingsRelationsState.loading = true;
+    setMasterSettingsRelationsStatus(
+      translate("masterSettingsRelationsLoading")
+    );
+    try {
+      const response = await data.callApi("masterRelations");
+      const payload = data.unwrapData(response);
+      masterSettingsRelationsState.relations = Array.isArray(payload)
+        ? payload
+        : [];
+      masterSettingsRelationsState.loaded = true;
+      renderMasterSettingsRelations();
+      refreshMasterSettingsRelationsSummary();
+    } catch (err) {
+      masterSettingsRelationsState.loaded = false;
+      setMasterSettingsRelationsStatus(err.message, true);
+    } finally {
+      masterSettingsRelationsState.loading = false;
+    }
+  }
+
+  function addMasterSettingsRelationRow() {
+    masterSettingsRelationsState.loaded = true;
+    const tempKey = `new-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const newRow = {
+      __isNew: true,
+      __key: tempKey,
+      RelationID: null,
+      Source_Column_ID: "",
+      Search_Column_ID: "",
+      Display_Column_ID: "",
+      Direction: "",
+      Relation_Column_ID: "",
+      RelationEn: "",
+      RelationAr: "",
+      SourceLabel: "",
+      SearchLabel: "",
+      DisplayLabel: "",
+    };
+    masterSettingsRelationsState.relations = [
+      newRow,
+      ...masterSettingsRelationsState.relations,
+    ];
+    renderMasterSettingsRelations();
+    refreshMasterSettingsRelationsSummary();
+  }
+
+  function collectRelationRowData(row) {
+    const getValue = (name) => {
+      const element = row.querySelector(`[name="${name}"]`);
+      if (!element) return "";
+      const raw = element.value ?? "";
+      return typeof raw === "string" ? raw.trim() : `${raw}`.trim();
+    };
+    const sourceColumnId = getValue("sourceColumnId");
+    const searchColumnId = getValue("searchColumnId");
+    const displayColumnId = getValue("displayColumnId");
+    const direction = getValue("direction");
+    const relationColumnId = getValue("relationColumnId");
+    const relationEn = getValue("relationEn");
+    const relationAr = getValue("relationAr");
+    return {
+      Source_Column_ID: sourceColumnId,
+      Search_Column_ID: searchColumnId,
+      Display_Column_ID: displayColumnId,
+      Direction: direction || null,
+      Relation_Column_ID: relationColumnId || null,
+      RelationEn: relationEn || null,
+      RelationAr: relationAr || null,
+    };
+  }
+
+  function validateRelationPayload(payload) {
+    if (
+      !payload.Source_Column_ID ||
+      !payload.Search_Column_ID ||
+      !payload.Display_Column_ID
+    ) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsMissingColumns"),
+        true
+      );
+      return false;
+    }
+    const hasRelationColumn = !!payload.Relation_Column_ID;
+    const hasOnlyOneText =
+      (payload.RelationEn && !payload.RelationAr) ||
+      (!payload.RelationEn && payload.RelationAr);
+    if (hasOnlyOneText) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsMissingRelation"),
+        true
+      );
+      return false;
+    }
+    const hasRelationTexts = !!payload.RelationEn && !!payload.RelationAr;
+    if (!hasRelationColumn && !hasRelationTexts) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsMissingRelation"),
+        true
+      );
+      return false;
+    }
+    if (hasRelationColumn && (payload.RelationEn || payload.RelationAr)) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsExclusiveRelation"),
+        true
+      );
+      return false;
+    }
+    return true;
+  }
+
+  async function saveRelationRow(row, button) {
+    const payload = collectRelationRowData(row);
+    row.classList.remove("error");
+    if (!validateRelationPayload(payload)) {
+      row.classList.add("error");
+      return;
+    }
+    row.classList.add("saving");
+    button.disabled = true;
+    setMasterSettingsRelationsStatus(
+      translate("masterSettingsRelationsLoading")
+    );
+    try {
+      await data.callApi("saveRelation", payload);
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsSaved")
+      );
+      await loadMasterSettingsRelations(true);
+    } catch (err) {
+      row.classList.add("error");
+      setMasterSettingsRelationsStatus(err.message, true);
+    } finally {
+      row.classList.remove("saving");
+      button.disabled = false;
+    }
+  }
+
+  async function deleteRelationRow(row, button) {
+    const relationId = parseInt(row.dataset.relationId || "", 10);
+    if (!relationId || Number.isNaN(relationId)) {
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsDeleteError"),
+        true
+      );
+      return;
+    }
+    const confirmMessage = translate("masterSettingsRelationsDeleteConfirm");
+    const confirmed =
+      typeof window.confirm === "function"
+        ? window.confirm(confirmMessage)
+        : true;
+    if (!confirmed) {
+      return;
+    }
+    row.classList.remove("error");
+    row.classList.add("saving");
+    button.disabled = true;
+    setMasterSettingsRelationsStatus(
+      translate("masterSettingsRelationsLoading")
+    );
+    try {
+      await data.callApi("deleteRelation", { relationId });
+      removeRelationFromState(relationId);
+      renderMasterSettingsRelations();
+      refreshMasterSettingsRelationsSummary();
+      setMasterSettingsRelationsStatus(
+        translate("masterSettingsRelationsDeleted")
+      );
+    } catch (err) {
+      row.classList.add("error");
+      setMasterSettingsRelationsStatus(
+        err.message || translate("masterSettingsRelationsDeleteError"),
+        true
+      );
+    } finally {
+      row.classList.remove("saving");
+      button.disabled = false;
+    }
+  }
+
+  function markRelationRowDirty(event) {
+    if (!(event.target instanceof Element)) return;
+    const row = event.target.closest(".master-settings-relations-row");
+    if (!row) return;
+    row.classList.add("dirty");
+  }
+
+  function removeRelationFromState(relationId) {
+    const normalized = `${relationId ?? ""}`.trim();
+    if (!normalized) return;
+    masterSettingsRelationsState.relations = masterSettingsRelationsState.relations.filter(
+      (relation) =>
+        `${getRecordField(relation, "RelationID", "relationId")}`.trim() !== normalized
+    );
+  }
+
+  els.masterSettingsRelationsRefresh?.addEventListener("click", () => {
+    loadMasterSettingsRelations(true);
+  });
+
+  els.masterSettingsRelationsAdd?.addEventListener("click", async () => {
+    await loadMasterSettingsLegends();
+    if (!masterSettingsRelationsState.loaded) {
+      await loadMasterSettingsRelations(true);
+    }
+    addMasterSettingsRelationRow();
+  });
+
+  els.masterSettingsRelationsBody?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest("button[data-action]");
+    if (!button) return;
+    const row = button.closest(".master-settings-relations-row");
+    if (!row) return;
+    const action = button.dataset.action;
+    if (action === "save") {
+      saveRelationRow(row, button);
+    } else if (action === "delete") {
+      deleteRelationRow(row, button);
+    }
+  });
+
+  els.masterSettingsRelationsBody?.addEventListener("input", markRelationRowDirty);
+  els.masterSettingsRelationsBody?.addEventListener("change", markRelationRowDirty);
 
   const updateTimelineRecording = () => {
     if (!els.timelineRecordToggle) {
@@ -806,6 +1580,10 @@ function initApp() {
     }
     state.language = els.language.value;
     applyLanguageChrome();
+    renderMasterSettingsLegends();
+    refreshMasterSettingsLegendsSummary();
+    renderMasterSettingsRelations();
+    refreshMasterSettingsRelationsSummary();
     data.clearItems(true);
     await data.loadViews();
     await refreshLegendsPanel({ force: true });

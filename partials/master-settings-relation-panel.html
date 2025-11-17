@@ -1,0 +1,65 @@
+<section class="master-settings-relations" aria-live="polite">
+  <header class="master-settings-relations-header">
+    <div>
+      <h3 data-i18n="masterSettingsRelationsHeading">Relations</h3>
+      <p
+        id="masterSettingsRelationsStatus"
+        class="master-settings-relations-status"
+        data-i18n="masterSettingsRelationsStatusIdle"
+      >
+        Manage relations between entities.
+      </p>
+    </div>
+    <div class="master-settings-relations-actions">
+      <button
+        type="button"
+        class="secondary"
+        id="masterSettingsRelationsRefresh"
+        data-i18n="masterSettingsRelationsRefresh"
+      >
+        Refresh
+      </button>
+      <button
+        type="button"
+        id="masterSettingsRelationsAdd"
+        data-i18n="masterSettingsRelationsAdd"
+      >
+        Add relation
+      </button>
+    </div>
+  </header>
+  <div class="master-settings-relations-table-wrapper" role="region">
+    <table class="master-settings-relations-table">
+      <thead>
+        <tr>
+          <th data-i18n="masterSettingsRelationsId">Relation ID</th>
+          <th data-i18n="masterSettingsRelationsSource">Source Column</th>
+          <th data-i18n="masterSettingsRelationsSearch">Search Column</th>
+          <th data-i18n="masterSettingsRelationsDisplay">Display Column</th>
+          <th data-i18n="masterSettingsRelationsDirection">Direction</th>
+          <th data-i18n="masterSettingsRelationsRelationColumn">
+            Relation Column
+          </th>
+          <th data-i18n="masterSettingsRelationsRelationEn">Relation (EN)</th>
+          <th data-i18n="masterSettingsRelationsRelationAr">Relation (AR)</th>
+          <th data-i18n="masterSettingsRelationsActions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="masterSettingsRelationsBody">
+        <tr>
+          <td colspan="9" data-i18n="masterSettingsRelationsLoading">
+            Loading relations...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div
+      id="masterSettingsRelationsEmpty"
+      class="master-settings-relations-empty"
+      data-i18n="masterSettingsRelationsEmpty"
+      hidden
+    >
+      No relations configured.
+    </div>
+  </div>
+</section>

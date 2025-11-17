@@ -6,6 +6,11 @@ window.APP_CONFIG = {
     legends: { path: "/node-legends", method: "POST" },
     items: { path: "/items", method: "POST" },
     expand: { path: "/expand", method: "POST" },
+    masterNodes: { path: "/master-nodes", method: "GET" },
+    updateMasterNode: { path: "/master-nodes/update", method: "POST" },
+    masterRelations: { path: "/master-relations", method: "GET" },
+    saveRelation: { path: "/master-relations/save", method: "POST" },
+    deleteRelation: { path: "/master-relations/delete", method: "POST" },
   },
   defaults: {
     maxItems: 20,

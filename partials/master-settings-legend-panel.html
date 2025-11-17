@@ -1,0 +1,53 @@
+<section class="master-settings-legends" aria-live="polite">
+  <header class="master-settings-legends-header">
+    <div>
+      <h3 data-i18n="masterSettingsLegendsHeading">Legends</h3>
+      <p
+        id="masterSettingsLegendsStatus"
+        class="master-settings-legends-status"
+        data-i18n="masterSettingsLegendsStatusIdle"
+      >
+        Use the controls below to edit your legends.
+      </p>
+    </div>
+    <div class="master-settings-legends-actions">
+      <button
+        type="button"
+        class="secondary"
+        id="masterSettingsLegendsRefresh"
+        data-i18n="masterSettingsLegendsRefresh"
+      >
+        Refresh
+      </button>
+    </div>
+  </header>
+  <div class="master-settings-legends-table-wrapper" role="region">
+    <table class="master-settings-legends-table">
+      <thead>
+        <tr>
+          <th data-i18n="masterSettingsLegendColumnId">Column ID</th>
+          <th data-i18n="masterSettingsLegendColumnEn">Column (EN)</th>
+          <th data-i18n="masterSettingsLegendColumnAr">Column (AR)</th>
+          <th data-i18n="masterSettingsLegendColor">Color</th>
+          <th data-i18n="masterSettingsLegendActive">Active</th>
+          <th data-i18n="masterSettingsLegendActions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="masterSettingsLegendsBody">
+        <tr>
+          <td colspan="6" data-i18n="masterSettingsLegendsLoading">
+            Loading legends...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div
+      id="masterSettingsLegendsEmpty"
+      class="master-settings-legends-empty"
+      data-i18n="masterSettingsLegendsEmpty"
+      hidden
+    >
+      No legends available.
+    </div>
+  </div>
+</section>

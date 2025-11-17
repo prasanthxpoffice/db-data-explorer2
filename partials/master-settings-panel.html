@@ -1,0 +1,78 @@
+<div
+  class="master-settings-overlay"
+  id="masterSettingsOverlay"
+  aria-hidden="true"
+>
+  <div
+    class="master-settings-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="masterSettingsTitle"
+  >
+    <header class="master-settings-header">
+      <h2 id="masterSettingsTitle" data-i18n="masterSettingsTitle">
+        Master Settings
+      </h2>
+      <button
+        type="button"
+        class="master-settings-close"
+        id="masterSettingsClose"
+        aria-label="Close master settings"
+        data-i18n-aria-label="masterSettingsCloseAria"
+      >
+        ×
+      </button>
+    </header>
+    <div class="master-settings-tabs" role="tablist">
+      <button
+        type="button"
+        class="master-settings-tab active"
+        data-master-tab="legends"
+        role="tab"
+        aria-selected="true"
+        aria-controls="masterSettingsTabLegendsPanel"
+        id="masterSettingsTabLegends"
+        data-i18n="masterSettingsTabLegends"
+      >
+        Legends
+      </button>
+      <button
+        type="button"
+        class="master-settings-tab"
+        data-master-tab="entities"
+        role="tab"
+        aria-selected="false"
+        aria-controls="masterSettingsTabEntitiesPanel"
+        id="masterSettingsTabEntities"
+        data-i18n="masterSettingsTabEntities"
+      >
+        Entities
+      </button>
+    </div>
+    <div
+      class="master-settings-panel active"
+      data-master-panel="legends"
+      role="tabpanel"
+      id="masterSettingsTabLegendsPanel"
+      aria-labelledby="masterSettingsTabLegends"
+    >
+      <div
+        id="masterSettingsLegendsRoot"
+        data-partial="partials/master-settings-legend-panel.html"
+      ></div>
+    </div>
+    <div
+      class="master-settings-panel"
+      data-master-panel="entities"
+      role="tabpanel"
+      id="masterSettingsTabEntitiesPanel"
+      aria-labelledby="masterSettingsTabEntities"
+      hidden
+    >
+      <div
+        id="masterSettingsRelationsRoot"
+        data-partial="partials/master-settings-relation-panel.html"
+      ></div>
+    </div>
+  </div>
+</div>

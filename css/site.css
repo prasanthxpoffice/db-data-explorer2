@@ -139,6 +139,368 @@
   transform: translateY(0);
 }
 
+.graph-app .master-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  z-index: 30;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.graph-app .master-settings-overlay.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.graph-app .master-settings-dialog {
+  width: min(960px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.graph-app .master-settings-dialog.wide {
+  width: min(1280px, 100%);
+}
+
+.graph-app[data-theme="dark"] .master-settings-dialog {
+  background: #0f1828;
+  color: #f1f5ff;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.65);
+}
+
+.graph-app .master-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.graph-app .master-settings-close {
+  width: auto;
+  background: transparent;
+  color: inherit;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  padding: 4px;
+}
+
+.graph-app .master-settings-close:hover {
+  opacity: 0.7;
+}
+
+.graph-app .master-settings-tabs {
+  display: flex;
+  gap: 12px;
+}
+
+.graph-app .master-settings-tab {
+  width: auto;
+  flex: 1;
+  background: #e2e8f0;
+  color: #0f172a;
+  border: none;
+  padding: 10px;
+}
+
+.graph-app[data-theme="dark"] .master-settings-tab {
+  background: #1f2937;
+  color: #f8fafc;
+}
+
+.graph-app .master-settings-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.graph-app .master-settings-panel {
+  display: none;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.graph-app[data-theme="dark"] .master-settings-panel {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.graph-app .master-settings-panel.active {
+  display: block;
+}
+
+.graph-app .master-settings-legends {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.graph-app .master-settings-legends-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.graph-app .master-settings-legends-status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-status {
+  color: #cbd5f5;
+}
+
+.graph-app .master-settings-legends-status.error {
+  color: #b91c1c;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-status.error {
+  color: #f87171;
+}
+
+.graph-app .master-settings-legends-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.graph-app .master-settings-legends-table-wrapper {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-table-wrapper {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.graph-app .master-settings-legends-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-table {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.graph-app .master-settings-legends-table th,
+.graph-app .master-settings-legends-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  vertical-align: middle;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-table th,
+.graph-app[data-theme="dark"] .master-settings-legends-table td {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.graph-app .master-settings-legends-table th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.graph-app .master-settings-legends-table input[type="text"] {
+  width: 100%;
+}
+
+.graph-app .master-settings-legends-table input[type="color"] {
+  width: 48px;
+  height: 32px;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: transparent;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-table input[type="color"] {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.graph-app .master-settings-legends-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.graph-app .master-settings-legends-row.dirty {
+  background: rgba(250, 204, 21, 0.15);
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-row.dirty {
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.graph-app .master-settings-legends-row.error {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-row.error {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.graph-app .master-settings-legends-row.saving {
+  opacity: 0.6;
+}
+
+.graph-app .master-settings-legends-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .master-settings-legends-empty {
+  color: #cbd5f5;
+}
+
+.graph-app .master-settings-relations {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.graph-app .master-settings-relations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.graph-app .master-settings-relations-status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-status {
+  color: #cbd5f5;
+}
+
+.graph-app .master-settings-relations-status.error {
+  color: #b91c1c;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-status.error {
+  color: #f87171;
+}
+
+.graph-app .master-settings-relations-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.graph-app .master-settings-relations-table-wrapper {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-table-wrapper {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.graph-app .master-settings-relations-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-table {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.graph-app .master-settings-relations-table th,
+.graph-app .master-settings-relations-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  vertical-align: middle;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-table th,
+.graph-app[data-theme="dark"] .master-settings-relations-table td {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.graph-app .master-settings-relations-table th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.graph-app .master-settings-relations-table input[type="text"],
+.graph-app .master-settings-relations-table select {
+  width: 100%;
+}
+
+.graph-app .master-settings-relations-table small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-table small {
+  color: #cbd5f5;
+}
+
+.graph-app .master-settings-relations-table button.danger {
+  background: #dc2626;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-table button.danger {
+  background: #b91c1c;
+}
+
+.graph-app .master-settings-relations-row.dirty {
+  background: rgba(250, 204, 21, 0.15);
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-row.dirty {
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.graph-app .master-settings-relations-row.error {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-row.error {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.graph-app .master-settings-relations-row.saving {
+  opacity: 0.6;
+}
+
+.graph-app .master-settings-relations-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #475569;
+}
+
+.graph-app[data-theme="dark"] .master-settings-relations-empty {
+  color: #cbd5f5;
+}
+
 html[dir="rtl"] .graph-app #filter-panel-root {
   left: auto;
   right: 16px;

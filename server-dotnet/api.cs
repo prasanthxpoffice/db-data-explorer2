@@ -176,6 +176,118 @@ app.MapPost("/expand", async Task<IResult> (
         });
 });
 
+app.MapGet("/master-nodes", async Task<IResult> (
+    [FromQuery] string? lang,
+    [FromQuery] string? userId,
+    [FromServices] DbOptions options) =>
+{
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection => CreateStoredProcedure(connection, "[graphdb].[GetNodes]"));
+});
+
+app.MapPost("/master-nodes/update", async Task<IResult> (
+    [FromBody] MasterNodeUpdateRequest? request,
+    [FromServices] DbOptions options) =>
+{
+    if (request is null || string.IsNullOrWhiteSpace(request.Column_ID))
+    {
+        return Results.BadRequest(new { message = "Column_ID is required." });
+    }
+
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[UpdateNode]");
+            command.Parameters.Add(new SqlParameter("@Column_ID", SqlDbType.NVarChar, 128) { Value = request.Column_ID });
+            command.Parameters.Add(new SqlParameter("@ColumnEn", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnEn ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@ColumnAr", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnAr ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@IsActive", SqlDbType.Bit) { Value = request.IsActive.HasValue ? request.IsActive.Value : System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@ColumnColor", SqlDbType.NVarChar, 20) { Value = (object?)request.ColumnColor ?? System.DBNull.Value });
+            return command;
+        });
+});
+
+app.MapGet("/master-relations", async Task<IResult> (
+    [FromQuery] string? lang,
+    [FromServices] DbOptions options) =>
+{
+    var normalizedLang = NormalizeLang(lang);
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[GetRelations]");
+            command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = normalizedLang });
+            return command;
+        });
+});
+
+app.MapPost("/master-relations/save", async Task<IResult> (
+    [FromBody] SaveRelationRequest? request,
+    [FromServices] DbOptions options) =>
+{
+    if (request is null)
+    {
+        return Results.BadRequest(new { message = "Request body is required." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Source_Column_ID) ||
+        string.IsNullOrWhiteSpace(request.Search_Column_ID) ||
+        string.IsNullOrWhiteSpace(request.Display_Column_ID))
+    {
+        return Results.BadRequest(new { message = "Source_Column_ID, Search_Column_ID and Display_Column_ID are required." });
+    }
+
+    var hasRelationColumn = !string.IsNullOrWhiteSpace(request.Relation_Column_ID);
+    var hasRelationText = !string.IsNullOrWhiteSpace(request.RelationEn) && !string.IsNullOrWhiteSpace(request.RelationAr);
+
+    if (!hasRelationColumn && !hasRelationText)
+    {
+        return Results.BadRequest(new { message = "Either Relation_Column_ID or (RelationEn and RelationAr) must be provided." });
+    }
+
+    if (hasRelationColumn && (request.RelationEn is not null || request.RelationAr is not null))
+    {
+        return Results.BadRequest(new { message = "RelationEn and RelationAr must be null when Relation_Column_ID is provided." });
+    }
+
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[SaveRelation]");
+            command.Parameters.Add(new SqlParameter("@Source_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Source_Column_ID });
+            command.Parameters.Add(new SqlParameter("@Search_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Search_Column_ID });
+            command.Parameters.Add(new SqlParameter("@Display_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Display_Column_ID });
+            command.Parameters.Add(new SqlParameter("@Direction", SqlDbType.NChar, 10) { Value = (object?)request.Direction ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@Relation_Column_ID", SqlDbType.NVarChar, 128) { Value = (object?)request.Relation_Column_ID ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@RelationEn", SqlDbType.NVarChar, 128) { Value = (object?)request.RelationEn ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@RelationAr", SqlDbType.NVarChar, 128) { Value = (object?)request.RelationAr ?? System.DBNull.Value });
+            return command;
+        });
+});
+
+app.MapPost("/master-relations/delete", async Task<IResult> (
+    [FromBody] DeleteRelationRequest? request,
+    [FromServices] DbOptions options) =>
+{
+    if (request is null || request.RelationID <= 0)
+    {
+        return Results.BadRequest(new { message = "RelationID is required." });
+    }
+
+    return await ExecuteStoredProcedure(
+        options.ConnectionString,
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[DeleteRelation]");
+            command.Parameters.Add(new SqlParameter("@RelationID", SqlDbType.Int) { Value = request.RelationID });
+            return command;
+        });
+});
+
 app.Run();
 
 static async Task<IResult> ExecuteStoredProcedure(
@@ -315,3 +427,23 @@ record ExpandRequest(
     DateOnly FromDate,
     DateOnly ToDate,
     int MaxNodes) : GraphRequestBase(Lang, ViewIds);
+
+record MasterNodeUpdateRequest(
+    string Column_ID,
+    string? ColumnEn,
+    string? ColumnAr,
+    bool? IsActive,
+    string? ColumnColor,
+    string? Lang,
+    string? UserId);
+
+record SaveRelationRequest(
+    string Source_Column_ID,
+    string Search_Column_ID,
+    string Display_Column_ID,
+    string? Direction,
+    string? Relation_Column_ID,
+    string? RelationEn,
+    string? RelationAr);
+
+record DeleteRelationRequest(int RelationID);
