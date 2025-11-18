@@ -119,6 +119,8 @@ function initApp() {
     hideLeaves: APP_CONFIG.defaults?.hideLeaves ?? false,
     theme: APP_CONFIG.defaults?.theme ?? "light",
     autoExpandDepth: APP_CONFIG.defaults?.autoExpandDepth ?? 1,
+    autoExpandMinDepth: APP_CONFIG.defaults?.autoExpandMinDepth ?? 1,
+    autoExpandMaxDepth: APP_CONFIG.defaults?.autoExpandMaxDepth ?? 5,
   };
 
   const dateDefaults = {
@@ -412,9 +414,25 @@ function initApp() {
   if (els.autoExpandToggle) {
     els.autoExpandToggle.checked = false;
   }
-  if (els.autoExpandDepth) {
-    els.autoExpandDepth.value = `${state.autoExpandDepth}`;
-  }
+  const buildAutoExpandOptions = () => {
+    if (!els.autoExpandDepth) return;
+    const min = defaults.autoExpandMinDepth ?? 1;
+    const max = defaults.autoExpandMaxDepth ?? 5;
+    const clampedMin = Number.isFinite(min) ? Math.max(1, Math.floor(min)) : 1;
+    const clampedMax = Number.isFinite(max)
+      ? Math.max(clampedMin, Math.floor(max))
+      : Math.max(clampedMin, 5);
+    const options = [];
+    for (let i = clampedMin; i <= clampedMax; i += 1) {
+      const selected = i === state.autoExpandDepth ? "selected" : "";
+      options.push(`<option value="${i}" ${selected}>${i}</option>`);
+    }
+    els.autoExpandDepth.innerHTML = options.join("");
+    if (!options.some((opt) => opt.includes('value="' + state.autoExpandDepth + '"'))) {
+      state.autoExpandDepth = clampedMin;
+    }
+  };
+  buildAutoExpandOptions();
   if (els.themeSelect) {
     els.themeSelect.value = defaults.theme;
   }
@@ -2000,7 +2018,11 @@ function initApp() {
 
   els.autoExpandDepth?.addEventListener("change", () => {
     const raw = parseInt(els.autoExpandDepth.value, 10);
-    const normalized = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 5) : 1;
+    const min = defaults.autoExpandMinDepth ?? 1;
+    const max = defaults.autoExpandMaxDepth ?? 5;
+    const normalized = Number.isFinite(raw)
+      ? Math.min(Math.max(raw, min), max)
+      : min;
     state.autoExpandDepth = normalized;
     if (els.autoExpandDepth.value !== `${normalized}`) {
       els.autoExpandDepth.value = `${normalized}`;
@@ -2028,6 +2050,9 @@ function initApp() {
       setStatus(translate("statusBuildingGraph"));
       graph.resetAutoExpandProgress();
       pathModule?.onGraphCleared?.();
+      graph.clearGraph();
+      timelineModule?.resetHistory?.();
+      setGraphReadyState(false);
       const legendFilters = getLegendFiltersPayload();
 
       const nodes = new Map();

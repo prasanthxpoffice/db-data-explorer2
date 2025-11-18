@@ -16,6 +16,8 @@ window.APP_CONFIG = {
     maxItems: 20,
     maxNodes: 200,
     autoExpandDepth: 1,
+    autoExpandMinDepth: 1,
+    autoExpandMaxDepth: 12,
   },
   defaultLang: "en",
   showLanguageSelector: true,
