@@ -5,7 +5,6 @@
     state,
     els,
     defaults,
-    dateDefaults,
     DEFAULT_NODE_COLOR,
     setStatus,
     translate,
@@ -13,6 +12,7 @@
     unwrapData,
     getMaxNodes,
     getAutoExpandDepth,
+    getLegendFilters,
     onNodeSelected,
     onEdgeSelected,
     onGraphCleared,
@@ -211,13 +211,14 @@
       }
       const [colId, nodeId] = parsed;
       const baseDepth = autoExpandLevels.get(sourceKey) ?? 0;
+      const filterPayload =
+        typeof getLegendFilters === "function" ? getLegendFilters() : [];
       const rows = await callApi("expand", {
         viewIds: state.viewIds,
         sourceColId: colId,
         sourceId: nodeId,
-        fromDate: dateDefaults.from,
-        toDate: dateDefaults.to,
         maxNodes: getMaxNodes(),
+        filters: filterPayload,
       }).then(unwrapData);
 
       const nodesToAdd = [];

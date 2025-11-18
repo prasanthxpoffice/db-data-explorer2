@@ -51,7 +51,7 @@ app.MapGet("/views", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[api_GetViews]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_ViewsGet]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = normalizedLang });
             return command;
         });
@@ -70,7 +70,7 @@ app.MapPost("/node-types", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[api_GetNodeTypes]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_NodeTypesGet]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = lang });
             command.Parameters.Add(tvp);
             return command;
@@ -92,7 +92,7 @@ app.MapPost("/node-legends", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[api_GetNodeLegends]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_NodeLegendsGet]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = lang });
             command.Parameters.Add(tvp);
             command.Parameters.Add(new SqlParameter("@OnlyActive", SqlDbType.Bit) { Value = onlyActive });
@@ -125,7 +125,7 @@ app.MapPost("/items", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[api_GetItems]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_ViewColumnItemsGet]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = lang });
             command.Parameters.Add(tvp);
             command.Parameters.Add(new SqlParameter("@ColId", SqlDbType.NVarChar, 128) { Value = request.ColId });
@@ -159,19 +159,19 @@ app.MapPost("/expand", async Task<IResult> (
     }
 
     var maxNodes = NormalizeMaxNodes(request.MaxNodes);
+    var filtersParameter = CreateLegendFiltersParameter("@Filters", request.Filters);
 
     return await ExecuteStoredProcedure(
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[api_Expand]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_NodeExpand]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = lang });
             command.Parameters.Add(tvp);
             command.Parameters.Add(new SqlParameter("@SourceColId", SqlDbType.NVarChar, 128) { Value = request.SourceColId });
             command.Parameters.Add(new SqlParameter("@SourceId", SqlDbType.NVarChar, 4000) { Value = request.SourceId });
-            command.Parameters.Add(new SqlParameter("@FromDate", SqlDbType.Date) { Value = ToDate(request.FromDate) });
-            command.Parameters.Add(new SqlParameter("@ToDate", SqlDbType.Date) { Value = ToDate(request.ToDate) });
             command.Parameters.Add(new SqlParameter("@MaxNodes", SqlDbType.Int) { Value = maxNodes });
+            command.Parameters.Add(filtersParameter);
             return command;
         });
 });
@@ -183,7 +183,7 @@ app.MapGet("/master-nodes", async Task<IResult> (
 {
     return await ExecuteStoredProcedure(
         options.ConnectionString,
-        connection => CreateStoredProcedure(connection, "[graphdb].[GetNodes]"));
+        connection => CreateStoredProcedure(connection, "[graphdb].[api_NodesGet]"));
 });
 
 app.MapPost("/master-nodes/update", async Task<IResult> (
@@ -199,7 +199,7 @@ app.MapPost("/master-nodes/update", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[UpdateNode]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_NodeUpdate]");
             command.Parameters.Add(new SqlParameter("@Column_ID", SqlDbType.NVarChar, 128) { Value = request.Column_ID });
             command.Parameters.Add(new SqlParameter("@ColumnEn", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnEn ?? System.DBNull.Value });
             command.Parameters.Add(new SqlParameter("@ColumnAr", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnAr ?? System.DBNull.Value });
@@ -218,7 +218,7 @@ app.MapGet("/master-relations", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[GetRelations]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_RelationsGet]");
             command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = normalizedLang });
             return command;
         });
@@ -257,7 +257,7 @@ app.MapPost("/master-relations/save", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[SaveRelation]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_RelationSave]");
             command.Parameters.Add(new SqlParameter("@Source_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Source_Column_ID });
             command.Parameters.Add(new SqlParameter("@Search_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Search_Column_ID });
             command.Parameters.Add(new SqlParameter("@Display_Column_ID", SqlDbType.NVarChar, 128) { Value = request.Display_Column_ID });
@@ -282,7 +282,7 @@ app.MapPost("/master-relations/delete", async Task<IResult> (
         options.ConnectionString,
         connection =>
         {
-            var command = CreateStoredProcedure(connection, "[graphdb].[DeleteRelation]");
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_RelationDelete]");
             command.Parameters.Add(new SqlParameter("@RelationID", SqlDbType.Int) { Value = request.RelationID });
             return command;
         });
@@ -386,13 +386,62 @@ static SqlParameter CreateIntListParameter(string name, IReadOnlyCollection<int>
     };
 }
 
+static SqlParameter CreateLegendFiltersParameter(string name, IReadOnlyList<LegendFilterDto>? filters)
+{
+    var table = new DataTable();
+    table.Columns.Add("DestinationColId", typeof(string));
+    table.Columns.Add("FromDate", typeof(DateTime));
+    table.Columns.Add("ToDate", typeof(DateTime));
+
+    if (filters is not null)
+    {
+        foreach (var filter in filters)
+        {
+            if (filter is null || string.IsNullOrWhiteSpace(filter.DestinationColId))
+            {
+                continue;
+            }
+
+            var row = table.NewRow();
+            row["DestinationColId"] = filter.DestinationColId;
+            row["FromDate"] = TryParseDate(filter.FromDate) ?? (object)DBNull.Value;
+            row["ToDate"] = TryParseDate(filter.ToDate) ?? (object)DBNull.Value;
+            table.Rows.Add(row);
+        }
+    }
+
+    return new SqlParameter(name, SqlDbType.Structured)
+    {
+        TypeName = "graphdb.ExpandDateFilter",
+        Value = table
+    };
+}
+
 static int NormalizeMaxNodes(int raw)
 {
     const int max = 10_000;
     return Math.Clamp(raw <= 0 ? 1 : raw, 1, max);
 }
 
-static DateTime ToDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
+static DateTime? TryParseDate(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return null;
+    }
+
+    if (DateOnly.TryParse(value, out var dateOnly))
+    {
+        return dateOnly.ToDateTime(TimeOnly.MinValue);
+    }
+
+    if (DateTime.TryParse(value, out var dateTime))
+    {
+        return dateTime.Date;
+    }
+
+    return null;
+}
 
 static string NormalizeLang(string? lang)
 {
@@ -424,9 +473,10 @@ record ExpandRequest(
     IReadOnlyList<int> ViewIds,
     string SourceColId,
     string SourceId,
-    DateOnly FromDate,
-    DateOnly ToDate,
-    int MaxNodes) : GraphRequestBase(Lang, ViewIds);
+    int MaxNodes,
+    IReadOnlyList<LegendFilterDto>? Filters) : GraphRequestBase(Lang, ViewIds);
+
+record LegendFilterDto(string DestinationColId, string? FromDate, string? ToDate);
 
 record MasterNodeUpdateRequest(
     string Column_ID,

@@ -172,7 +172,7 @@
 }
 
 .graph-app .master-settings-dialog.wide {
-  width: min(1280px, 100%);
+  width: 100%;
 }
 
 .graph-app[data-theme="dark"] .master-settings-dialog {
@@ -337,6 +337,10 @@
 .graph-app .master-settings-legends-table input[type="checkbox"] {
   width: 18px;
   height: 18px;
+}
+
+.graph-app .master-settings-legends-table .legend-date-input {
+  width: 100%;
 }
 
 .graph-app .master-settings-legends-row.dirty {

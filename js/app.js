@@ -194,8 +194,6 @@ function initApp() {
     viewsToggle: document.getElementById("viewsToggle"),
     viewsOptions: document.getElementById("viewsOptions"),
     nodeType: document.getElementById("nodeType"),
-    fromDate: document.getElementById("fromDate"),
-    toDate: document.getElementById("toDate"),
     itemSearch: document.getElementById("itemSearch"),
     itemSuggestions: document.getElementById("itemSuggestions"),
     addSelected: document.getElementById("addSelected"),
@@ -276,10 +274,21 @@ function initApp() {
   let pathModule = null;
   let timelineModule = null;
   let timelineRecordingEnabled = false;
+  const pinnedPanels = new Set();
 
   const infoPanelEls = {
     content: null,
     hydrated: false,
+  };
+  const isPanelPinned = (name) => pinnedPanels.has(name);
+  const setPanelPinned = (name, pinned) => {
+    if (!floatingPanels[name]) return;
+    if (pinned) {
+      pinnedPanels.add(name);
+    } else {
+      pinnedPanels.delete(name);
+    }
+    applyPanelState();
   };
   function hydrateInfoPanel() {
     infoPanelEls.content = document.getElementById("infoContent");
@@ -428,7 +437,6 @@ function initApp() {
     state,
     els,
     defaults,
-    dateDefaults,
     DEFAULT_NODE_COLOR,
     setStatus,
     translate,
@@ -436,6 +444,7 @@ function initApp() {
     unwrapData: data.unwrapData,
     getMaxNodes,
     getAutoExpandDepth: () => state.autoExpandDepth,
+    getLegendFilters: getLegendFiltersPayload,
     onNodeSelected: handleNodeSelection,
     onEdgeSelected: infoPanel.renderEdgeInfo,
     onGraphCleared: infoPanel.reset,
@@ -1319,13 +1328,11 @@ function initApp() {
       .map(
         (s, i) => `
       <li>
-        <div class="row">
-          <b>${s.colLabel ?? s.colId}</b> &mdash; ${s.text}
-          <span class="pill">${s.id}</span>
-        </div>
-        <div class="row" style="margin-top:6px">
-          <span>${translate("fromLabel")}: ${s.fromDate || translate("anyValue")}</span>
-          <span>${translate("toLabel")}: ${s.toDate || translate("anyValue")}</span>
+        <div class="row selection-entry">
+          <div class="selection-info">
+            <b>${s.colLabel ?? s.colId}</b> &mdash; ${s.text}
+            <span class="pill">${s.id}</span>
+          </div>
           <button data-i="${i}" class="rm danger remove-pill" aria-label="Remove">&times;</button>
         </div>
       </li>
@@ -1373,7 +1380,7 @@ function initApp() {
           .join(",")
       : "";
 
-  function ensureLegendControlByKey(key) {
+  function ensureLegendControlByKey(key, colId) {
     if (!key) return null;
     const existing = state.legendControls[key];
     if (existing) {
@@ -1389,6 +1396,9 @@ function initApp() {
       if (!("useDateFilter" in existing)) {
         existing.useDateFilter = false;
       }
+      if (colId && !existing.colId) {
+        existing.colId = colId;
+      }
       return existing;
     }
     const next = {
@@ -1397,12 +1407,15 @@ function initApp() {
       toDate: dateDefaults.to,
       useDateFilter: false,
     };
+    if (colId) {
+      next.colId = colId;
+    }
     state.legendControls[key] = next;
     return next;
   }
 
   function ensureLegendControl(colId) {
-    return ensureLegendControlByKey(legendKey(colId));
+    return ensureLegendControlByKey(legendKey(colId), colId);
   }
 
   function renderLegendsPanel() {
@@ -1454,13 +1467,13 @@ function initApp() {
         const color =
           legend.color ?? legend.Color ?? DEFAULT_NODE_COLOR;
         const key = legendKey(colId);
-        const controls = ensureLegendControlByKey(key);
+        const controls = ensureLegendControlByKey(key, colId);
         if (!key || !controls) {
           return "";
         }
         const checkedAttr = controls.active === false ? "" : "checked";
-        const fromDate = controls.fromDate || "";
-        const toDate = controls.toDate || "";
+        const fromDate = formatDisplayDate(controls.fromDate);
+        const toDate = formatDisplayDate(controls.toDate);
         const ariaLabel = escapeHtml(translate("legendsActiveAria"));
         const dateToggleLabel = escapeHtml(
           translate("legendsDateToggleAria", "Toggle date filter")
@@ -1479,16 +1492,22 @@ function initApp() {
         `;
         const fromContent = showDates
           ? `<input
-                type="date"
+                type="text"
+                class="legend-date-input"
                 data-role="legend-from"
                 value="${escapeHtml(fromDate)}"
+                inputmode="numeric"
+                placeholder="dd/mm/yyyy"
               />`
           : `<span class="legend-date-placeholder">&mdash;</span>`;
         const toContent = showDates
           ? `<input
-                type="date"
+                type="text"
+                class="legend-date-input"
                 data-role="legend-to"
                 value="${escapeHtml(toDate)}"
+                inputmode="numeric"
+                placeholder="dd/mm/yyyy"
               />`
           : `<span class="legend-date-placeholder">&mdash;</span>`;
         const colorValue = escapeHtml(color);
@@ -1515,7 +1534,116 @@ function initApp() {
       .filter(Boolean)
       .join("");
     els.legendsTableBody.innerHTML = rows;
+    initLegendDatePickers();
     applyLegendFiltersToGraph();
+  }
+
+  function initLegendDatePickers() {
+    const jq = window.jQuery;
+    if (!jq || !jq.fn?.datepicker) return;
+    const inputs = jq(".legend-date-input");
+    if (!inputs.length) return;
+    inputs.each(function () {
+      const $input = jq(this);
+      if ($input.hasClass("hasDatepicker")) {
+        $input.datepicker("destroy");
+      }
+      $input.datepicker({
+        dateFormat: "dd/mm/yy",
+        showAnim: "fadeIn",
+        onSelect: () => {
+          this.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+        onClose: () => {
+          this.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+      });
+    });
+  }
+
+  function sanitizeDateString(value) {
+    if (!value) return null;
+    const text = `${value}`.trim();
+    if (!text) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return text;
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
+      const [day, month, year] = text.split("/");
+      return `${year}-${month}-${day}`;
+    }
+    return text.slice(0, 10);
+  }
+
+  function formatDateISO(date) {
+    if (!(date instanceof Date)) return "";
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function getDefaultLegendDateRange() {
+    const now = new Date();
+    const toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const fromDate = new Date(toDate);
+    fromDate.setMonth(fromDate.getMonth() - 6);
+    return {
+      from: formatDateISO(fromDate),
+      to: formatDateISO(toDate),
+    };
+  }
+
+  function formatDisplayDate(value) {
+    if (!value) return "";
+    const text = `${value}`.trim();
+    if (!text) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      const [year, month, day] = text.split("-");
+      return `${day}/${month}/${year}`;
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
+      return text;
+    }
+    return text;
+  }
+
+  function parseDisplayDate(value) {
+    if (!value) return "";
+    const text = `${value}`.trim();
+    if (!text) return "";
+    const match = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const month = match[2].padStart(2, "0");
+      const year = match[3];
+      return `${year}-${month}-${day}`;
+    }
+    return sanitizeDateString(text) || "";
+  }
+
+  function getLegendFiltersPayload() {
+    const filters = [];
+    Object.keys(state.legendControls).forEach((key) => {
+      const controls = state.legendControls[key];
+      if (!controls) return;
+      const colId =
+        controls.colId ||
+        controls.columnId ||
+        controls.ColumnId ||
+        controls.column_id ||
+        "";
+      if (!colId) return;
+      const useDates = controls.useDateFilter === true;
+      const fromDate = useDates ? sanitizeDateString(controls.fromDate) : null;
+      const toDate = useDates ? sanitizeDateString(controls.toDate) : null;
+      filters.push({
+        destinationColId: colId,
+        fromDate,
+        toDate,
+      });
+    });
+    return filters;
   }
 
   async function refreshLegendsPanel(options = {}) {
@@ -1601,8 +1729,10 @@ function initApp() {
     });
     Object.entries(floatingPanels).forEach(([key, panel]) => {
       if (!panel) return;
-      const isActive = activeFloatingPanel === key;
+      const pinned = isPanelPinned(key);
+      const isActive = activeFloatingPanel === key || pinned;
       panel.classList.toggle("open", isActive);
+      panel.classList.toggle("pinned", pinned);
       if (key === "path" && pathModule) {
         if (isActive) {
           pathModule.onPanelOpen?.();
@@ -1642,6 +1772,7 @@ function initApp() {
     }
 
     if (activeFloatingPanel === name) {
+      setPanelPinned(name, false);
       closeFloatingPanels();
     } else {
       setActivePanel(name);
@@ -1699,6 +1830,8 @@ function initApp() {
       pathModule?.onGraphCleared?.();
     }
     refreshLegendsPanel();
+    setPanelPinned("filters", true);
+    setActivePanel("legends");
   });
 
   const handleLegendControlsChange = (event) => {
@@ -1719,11 +1852,18 @@ function initApp() {
       controls.active = target.checked;
     } else if (role === "legend-date-toggle") {
       controls.useDateFilter = target.checked;
+      if (controls.useDateFilter) {
+        const { from, to } = getDefaultLegendDateRange();
+        controls.fromDate = from;
+        controls.toDate = to;
+      }
       rerender = true;
     } else if (role === "legend-from") {
-      controls.fromDate = target.value;
+      controls.fromDate = parseDisplayDate(target.value);
+      target.value = formatDisplayDate(controls.fromDate);
     } else if (role === "legend-to") {
-      controls.toDate = target.value;
+      controls.toDate = parseDisplayDate(target.value);
+      target.value = formatDisplayDate(controls.toDate);
     }
     if (rerender) {
       renderLegendsPanel();
@@ -1807,18 +1947,11 @@ function initApp() {
       return;
     }
 
-    const fromDate = (els.fromDate?.value || "").trim();
-    const toDate = (els.toDate?.value || "").trim();
-
     state.selected.push({
       colId,
       colLabel,
       id: state.activeItem.id,
       text: state.activeItem.text,
-      fromDate,
-      toDate,
-      resolvedFromDate: fromDate || dateDefaults.from,
-      resolvedToDate: toDate || dateDefaults.to,
     });
 
     state.activeItem = null;
@@ -1895,6 +2028,7 @@ function initApp() {
       setStatus(translate("statusBuildingGraph"));
       graph.resetAutoExpandProgress();
       pathModule?.onGraphCleared?.();
+      const legendFilters = getLegendFiltersPayload();
 
       const nodes = new Map();
       const edges = new Map();
@@ -1904,8 +2038,8 @@ function initApp() {
 
       state.selected.forEach((sel) => {
         const key = nodeKey(sel.colId, sel.id);
-        const fromDate = sel.resolvedFromDate || sel.fromDate || "Any";
-        const toDate = sel.resolvedToDate || sel.toDate || "Any";
+        const fromDate = translate("anyValue");
+        const toDate = translate("anyValue");
         const entityLabel = getEntityLabel(sel.colId);
         nodes.set(key, {
           data: {
@@ -1934,9 +2068,8 @@ function initApp() {
           viewIds: state.viewIds,
           sourceColId: sel.colId,
           sourceId: sel.id,
-          fromDate: sel.resolvedFromDate ?? dateDefaults.from,
-          toDate: sel.resolvedToDate ?? dateDefaults.to,
           maxNodes: getMaxNodes(),
+          filters: legendFilters,
         });
         const rows = data.unwrapData(resp);
 
