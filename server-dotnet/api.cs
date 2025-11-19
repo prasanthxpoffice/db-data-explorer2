@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -179,11 +180,69 @@ app.MapPost("/expand", async Task<IResult> (
 app.MapGet("/master-nodes", async Task<IResult> (
     [FromQuery] string? lang,
     [FromQuery] string? userId,
+    [FromQuery] bool? includeInactive,
     [FromServices] DbOptions options) =>
 {
+    var showInactive = includeInactive ?? false;
+    try
+    {
+        await using var connection = new SqlConnection(options.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = CreateStoredProcedure(connection, "[graphdb].[api_NodesGet]");
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var rows = new List<Dictionary<string, object?>>();
+        while (await reader.ReadAsync())
+        {
+            var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            }
+
+            rows.Add(row);
+        }
+
+        if (!showInactive)
+        {
+            rows = rows
+                .Where(row =>
+                {
+                    if (!row.TryGetValue("IsActive", out var raw))
+                    {
+                        return true;
+                    }
+
+                    return ConvertToBool(raw);
+                })
+                .ToList();
+        }
+
+        return Results.Ok(new { data = rows });
+    }
+    catch (SqlException ex)
+    {
+        return Results.Problem(
+            title: "Database call failed",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+app.MapGet("/group-nodes", async Task<IResult> (
+    [FromQuery] string? lang,
+    [FromServices] DbOptions options) =>
+{
+    var normalizedLang = NormalizeLang(lang);
     return await ExecuteStoredProcedure(
         options.ConnectionString,
-        connection => CreateStoredProcedure(connection, "[graphdb].[api_NodesGet]"));
+        connection =>
+        {
+            var command = CreateStoredProcedure(connection, "[graphdb].[api_GroupNodeGet]");
+            command.Parameters.Add(new SqlParameter("@Lang", SqlDbType.NVarChar, 2) { Value = normalizedLang });
+            return command;
+        });
 });
 
 app.MapPost("/master-nodes/update", async Task<IResult> (
@@ -195,6 +254,11 @@ app.MapPost("/master-nodes/update", async Task<IResult> (
         return Results.BadRequest(new { message = "Column_ID is required." });
     }
 
+    if (request.GroupNodeID <= 0)
+    {
+        return Results.BadRequest(new { message = "GroupNodeID is required." });
+    }
+
     return await ExecuteStoredProcedure(
         options.ConnectionString,
         connection =>
@@ -203,6 +267,7 @@ app.MapPost("/master-nodes/update", async Task<IResult> (
             command.Parameters.Add(new SqlParameter("@Column_ID", SqlDbType.NVarChar, 128) { Value = request.Column_ID });
             command.Parameters.Add(new SqlParameter("@ColumnEn", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnEn ?? System.DBNull.Value });
             command.Parameters.Add(new SqlParameter("@ColumnAr", SqlDbType.NVarChar, 200) { Value = (object?)request.ColumnAr ?? System.DBNull.Value });
+            command.Parameters.Add(new SqlParameter("@GroupNodeID", SqlDbType.Int) { Value = request.GroupNodeID });
             command.Parameters.Add(new SqlParameter("@IsActive", SqlDbType.Bit) { Value = request.IsActive.HasValue ? request.IsActive.Value : System.DBNull.Value });
             command.Parameters.Add(new SqlParameter("@ColumnColor", SqlDbType.NVarChar, 20) { Value = (object?)request.ColumnColor ?? System.DBNull.Value });
             return command;
@@ -339,6 +404,29 @@ static SqlCommand CreateStoredProcedure(SqlConnection connection, string name)
     command.CommandText = name;
     command.CommandType = CommandType.StoredProcedure;
     return command;
+}
+
+static bool ConvertToBool(object? value)
+{
+    if (value is null || value is DBNull)
+    {
+        return false;
+    }
+
+    return value switch
+    {
+        bool b => b,
+        byte bt => bt != 0,
+        short s => s != 0,
+        int i => i != 0,
+        long l => l != 0,
+        float f => System.Math.Abs(f) > float.Epsilon,
+        double d => System.Math.Abs(d) > double.Epsilon,
+        decimal m => m != 0,
+        string text when bool.TryParse(text, out var boolValue) => boolValue,
+        string text when int.TryParse(text, out var intValue) => intValue != 0,
+        _ => false
+    };
 }
 
 static bool TryPrepareRequest(
@@ -482,6 +570,7 @@ record MasterNodeUpdateRequest(
     string Column_ID,
     string? ColumnEn,
     string? ColumnAr,
+    int GroupNodeID,
     bool? IsActive,
     string? ColumnColor,
     string? Lang,

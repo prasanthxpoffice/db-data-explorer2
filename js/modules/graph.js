@@ -1,71 +1,16 @@
 (function (window) {
   const GraphApp = (window.GraphApp = window.GraphApp || {});
-  const NodeUtils = GraphApp.NodeUtils || {};
-  const MAX_PIE_SLICES = 8;
-  const buildNodeKey =
-    NodeUtils.buildNodeKey ||
-    (({ groupNodeId, entityId, columnId }) => {
-      const id = `${entityId ?? ""}`.trim();
-      if (groupNodeId && id) {
-        return `group:${groupNodeId}:${id}`;
-      }
-      const col = `${columnId ?? ""}`.trim();
-      return `${col}:${id}`;
-    });
-  const buildRole =
-    NodeUtils.buildRole ||
-    ((colId, label, color) => ({
-      colId,
-      key: (colId || "").trim().toLowerCase(),
-      label,
-      color,
-    }));
-  const legendKey =
-    NodeUtils.legendKey ||
-    ((value) => (value || "").trim().toLowerCase());
-  const mergeRole =
-    NodeUtils.mergeRole ||
-    ((nodeData, role, defaultColor, options = {}) => {
-      if (!nodeData.meta) nodeData.meta = {};
-      if (!Array.isArray(nodeData.meta.roles)) {
-        nodeData.meta.roles = [];
-      }
-      const existing = nodeData.meta.roles.find((r) => r.key === role.key);
-      if (!existing) {
-        nodeData.meta.roles.push({ ...role });
-      }
-      applyRoleVisuals(nodeData, defaultColor, options);
-    });
-  const applyRoleVisuals =
-    NodeUtils.applyRoleVisuals ||
-    ((nodeData, defaultColor, options = {}) => {
-      const roles = nodeData.meta?.roles || [];
-      nodeData.primaryColor = nodeData.color || defaultColor;
-      nodeData.color = nodeData.primaryColor;
-      const slices = roles.length ? roles : [{ color: nodeData.primaryColor }];
-      const limited = slices.slice(0, MAX_PIE_SLICES);
-      const flags = limited.map((role) => {
-        if (typeof options.filterFn !== "function") return true;
-        try {
-          return !!options.filterFn(role);
-        } catch (err) {
-          console.warn("Legend role filter (graph fallback) failed", err);
-          return true;
-        }
-      });
-      const activeCount = roles.length ? flags.filter(Boolean).length : 1;
-      const share = activeCount ? 100 / activeCount : 0;
-      for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
-        const slice = limited[i - 1];
-        const flag = flags[i - 1];
-        nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
-        nodeData[`pie${i}Size`] = slice && flag ? share : 0;
-      }
-      nodeData.roleCount = roles.length;
-      nodeData.activeRoleCount = roles.length ? activeCount : 1;
-      nodeData.roleKeys = roles.map((role) => role.key || "");
-      return nodeData.activeRoleCount;
-    });
+  const NodeUtils = GraphApp.NodeUtils;
+  if (!NodeUtils) {
+    throw new Error("GraphApp.NodeUtils must be loaded before graph.js");
+  }
+  const {
+    buildNodeKey,
+    buildRole,
+    legendKey,
+    mergeRole,
+    applyRoleVisuals,
+  } = NodeUtils;
 
   GraphApp.createGraphModule = function ({
     state,

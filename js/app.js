@@ -1,81 +1,10 @@
 const DEFAULT_NODE_COLOR = "#87cefa";
 const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
-const NodeUtils = (window.GraphApp && window.GraphApp.NodeUtils) || {};
-const MAX_PIE_SLICES = 8;
-const buildNodeKey =
-  NodeUtils.buildNodeKey ||
-  (({ groupNodeId, entityId, columnId }) => {
-    const id = `${entityId ?? ""}`.trim();
-    if (groupNodeId && id) {
-      return `group:${groupNodeId}:${id}`;
-    }
-    const col = `${columnId ?? ""}`.trim();
-    return `${col}:${id}`;
-  });
-const buildRole = NodeUtils.buildRole || ((colId, label, color) => ({
-  colId,
-  key: (colId || "").trim().toLowerCase(),
-  label,
-  color,
-}));
-
-const applyRoleVisualsFallback = (
-  nodeData,
-  defaultColor = DEFAULT_NODE_COLOR,
-  options = {}
-) => {
-  if (!nodeData.meta) nodeData.meta = {};
-  if (!Array.isArray(nodeData.meta.roles)) {
-    nodeData.meta.roles = [];
-  }
-  const roles = nodeData.meta.roles.length
-    ? nodeData.meta.roles
-    : [{ color: defaultColor }];
-  nodeData.primaryColor = nodeData.color || defaultColor;
-  nodeData.color = nodeData.primaryColor;
-  nodeData.roleKeys = roles.map((role) => role.key || "");
-  const limited = roles.slice(0, MAX_PIE_SLICES);
-  const flags = limited.map((role) => {
-    if (typeof options.filterFn !== "function") return true;
-    try {
-      return !!options.filterFn(role);
-    } catch (err) {
-      console.warn("Role filter fallback error", err);
-      return true;
-    }
-  });
-  const activeCount = roles.length ? flags.filter(Boolean).length : 1;
-  const share = activeCount ? 100 / activeCount : 0;
-  for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
-    const slice = limited[i - 1];
-    const flag = flags[i - 1];
-    nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
-    nodeData[`pie${i}Size`] = slice && flag ? share : 0;
-  }
-  nodeData.roleCount = roles.length;
-  nodeData.activeRoleCount = roles.length ? activeCount : 1;
-  return nodeData.activeRoleCount;
-};
-
-const applyRoleVisuals =
-  NodeUtils.applyRoleVisuals ||
-  ((nodeData, defaultColor, options) => {
-    return applyRoleVisualsFallback(nodeData, defaultColor, options);
-  });
-
-const mergeRoleIntoNode =
-  NodeUtils.mergeRole ||
-  ((nodeData, role, defaultColor, options) => {
-    if (!nodeData.meta) nodeData.meta = {};
-    if (!Array.isArray(nodeData.meta.roles)) {
-      nodeData.meta.roles = [];
-    }
-    const existing = nodeData.meta.roles.find((r) => r.key === role.key);
-    if (!existing) {
-      nodeData.meta.roles.push({ ...role });
-    }
-    applyRoleVisualsFallback(nodeData, defaultColor, options);
-  });
+const NodeUtils = window.GraphApp?.NodeUtils;
+if (!NodeUtils) {
+  throw new Error("GraphApp.NodeUtils must be loaded before app.js");
+}
+const { buildNodeKey, buildRole, mergeRole: mergeRoleIntoNode } = NodeUtils;
 
 function escapeHtml(val = "") {
   return String(val)
@@ -663,8 +592,12 @@ function initApp() {
     legends: [],
     legendsLoaded: false,
     legendsLoading: false,
+    groupNodes: [],
+    groupNodesLoaded: false,
+    groupNodesLoading: false,
   };
   let masterSettingsLegendsPromise = null;
+  let masterSettingsGroupNodesPromise = null;
   const masterSettingsRelationsState = {
     relations: [],
     loaded: false,
@@ -693,6 +626,39 @@ function initApp() {
     if (!els.masterSettingsLegendsStatus) return;
     els.masterSettingsLegendsStatus.textContent = message;
     els.masterSettingsLegendsStatus.classList.toggle("error", isError);
+  }
+
+  function ensureMasterSettingsGroupHeader() {
+    if (!els.masterSettingsLegendsBody) return;
+    const table = els.masterSettingsLegendsBody.closest("table");
+    if (!table) return;
+    const headRow = table.querySelector("thead tr");
+    if (!headRow) return;
+    const cells = Array.from(headRow.children);
+    const groupCell = cells.find(
+      (cell) => cell.dataset?.i18n === "masterSettingsLegendGroupNode"
+    );
+    if (groupCell) {
+      groupCell.textContent = translate(
+        "masterSettingsLegendGroupNode",
+        groupCell.textContent || "Group node"
+      );
+      return;
+    }
+    const th = document.createElement("th");
+    th.dataset.i18n = "masterSettingsLegendGroupNode";
+    th.textContent = translate(
+      "masterSettingsLegendGroupNode",
+      "Group node"
+    );
+    const activeCell = cells.find(
+      (cell) => cell.dataset?.i18n === "masterSettingsLegendActive"
+    );
+    if (activeCell) {
+      headRow.insertBefore(th, activeCell);
+    } else {
+      headRow.appendChild(th);
+    }
   }
 
   function refreshMasterSettingsLegendsSummary() {
@@ -785,8 +751,72 @@ function initApp() {
   function buildNodeSelect(name, selectedId) {
     return `<select name="${name}">${buildNodeOptions(selectedId)}</select>`;
   }
+
+  function buildGroupNodeOptions(selectedId) {
+    const selected = selectedId === undefined || selectedId === null ? "" : `${selectedId}`.trim();
+    const placeholder = '<option value="">--</option>';
+    let hasSelectedOption = false;
+    const options = masterSettingsState.groupNodes
+      .map((node) => {
+        const id = `${getRecordField(node, "GroupNodeID", "groupNodeId")}`.trim();
+        if (!id) return "";
+        const label =
+          getRecordField(node, "GroupNode", "GroupNodeEn", "GroupNodeAr") || id;
+        const isSelected = !!selected && id === selected;
+        if (isSelected) {
+          hasSelectedOption = true;
+        }
+        return `<option value="${escapeHtml(id)}" ${
+          isSelected ? "selected" : ""
+        }>${escapeHtml(label)}</option>`;
+      })
+      .filter(Boolean);
+    if (selected && !hasSelectedOption) {
+      options.unshift(
+        `<option value="${escapeHtml(selected)}" selected>${escapeHtml(
+          selected
+        )}</option>`
+      );
+    }
+    return [placeholder, ...options].join("");
+  }
+
+  function buildGroupNodeSelect(selectedId) {
+    return `<select name="groupNodeId">${buildGroupNodeOptions(selectedId)}</select>`;
+  }
+
+  async function loadMasterSettingsGroupNodes(force = false) {
+    if (!force && masterSettingsState.groupNodesLoaded) {
+      return masterSettingsState.groupNodes;
+    }
+    if (masterSettingsState.groupNodesLoading) {
+      await masterSettingsGroupNodesPromise;
+      if (!force || masterSettingsState.groupNodesLoaded) {
+        return masterSettingsState.groupNodes;
+      }
+    }
+    masterSettingsState.groupNodesLoading = true;
+    const request = (async () => {
+      try {
+        const response = await data.callApi("groupNodes");
+        const payload = data.unwrapData(response);
+        masterSettingsState.groupNodes = Array.isArray(payload) ? payload : [];
+        masterSettingsState.groupNodesLoaded = true;
+        renderMasterSettingsLegends();
+      } catch (err) {
+        setMasterSettingsLegendsStatus(err.message, true);
+      } finally {
+        masterSettingsState.groupNodesLoading = false;
+        masterSettingsGroupNodesPromise = null;
+      }
+    })();
+    masterSettingsGroupNodesPromise = request;
+    await request;
+    return masterSettingsState.groupNodes;
+  }
   function renderMasterSettingsLegends() {
     if (!els.masterSettingsLegendsBody) return;
+    ensureMasterSettingsGroupHeader();
     const rows = masterSettingsState.legends
       .map((legend) => {
         const columnId = `${getRecordField(
@@ -803,6 +833,12 @@ function initApp() {
         const columnAr = getRecordField(legend, "ColumnAr", "columnAr");
         const color = normalizeLegendColor(
           getRecordField(legend, "ColumnColor", "columnColor")
+        );
+        const groupNodeId = getRecordField(
+          legend,
+          "GroupNodeID",
+          "groupNodeId",
+          "GroupNodeId"
         );
         const isActive = toBoolean(getRecordField(legend, "IsActive", "isActive"));
         const updateLabel = translate("masterSettingsLegendsUpdate");
@@ -824,6 +860,9 @@ function initApp() {
             <td class="color-cell">
               <input type="color" name="columnColor" value="${color}" />
             </td>
+            <td class="group-node-cell">
+              ${buildGroupNodeSelect(groupNodeId)}
+            </td>
             <td class="checkbox-cell">
               <input type="checkbox" name="isActive" ${
                 isActive ? "checked" : ""
@@ -840,7 +879,7 @@ function initApp() {
       .filter(Boolean);
 
     if (!rows.length) {
-      els.masterSettingsLegendsBody.innerHTML = `<tr><td colspan="6">${escapeHtml(
+      els.masterSettingsLegendsBody.innerHTML = `<tr><td colspan="7">${escapeHtml(
         translate("masterSettingsLegendsEmpty")
       )}</td></tr>`;
       if (els.masterSettingsLegendsEmpty) {
@@ -857,6 +896,7 @@ function initApp() {
 
   async function loadMasterSettingsLegends(force = false) {
     if (!els.masterSettingsLegendsBody) return;
+    await loadMasterSettingsGroupNodes(force);
     if (!force && masterSettingsState.legendsLoaded) return;
     if (masterSettingsState.legendsLoading) {
       await masterSettingsLegendsPromise;
@@ -868,7 +908,9 @@ function initApp() {
     setMasterSettingsLegendsStatus(translate("masterSettingsLegendsLoading"));
     const request = (async () => {
       try {
-        const response = await data.callApi("masterNodes");
+        const response = await data.callApi("masterNodes", {
+          includeInactive: true,
+        });
         const payload = data.unwrapData(response);
         masterSettingsState.legends = Array.isArray(payload) ? payload : [];
         masterSettingsState.legendsLoaded = true;
@@ -894,11 +936,21 @@ function initApp() {
     const columnAr = row.querySelector('input[name="columnAr"]')?.value ?? "";
     const columnColor =
       row.querySelector('input[name="columnColor"]')?.value ?? DEFAULT_NODE_COLOR;
+    const groupNodeValue =
+      row.querySelector('select[name="groupNodeId"]')?.value ?? "";
+    const parsedGroupNodeId = groupNodeValue
+      ? Number.parseInt(groupNodeValue, 10)
+      : null;
+    const groupNodeId =
+      typeof parsedGroupNodeId === "number" && !Number.isNaN(parsedGroupNodeId)
+        ? parsedGroupNodeId
+        : null;
     const isActive = row.querySelector('input[name="isActive"]')?.checked ?? false;
     return {
       Column_ID: columnId,
       ColumnEn: columnEn,
       ColumnAr: columnAr,
+      GroupNodeID: groupNodeId,
       ColumnColor: columnColor,
       IsActive: isActive,
     };
@@ -923,8 +975,20 @@ function initApp() {
   async function saveLegendRow(row, button) {
     const payload = collectLegendRowData(row);
     if (!payload) return;
-    row.classList.add("saving");
     row.classList.remove("error");
+    const groupId = payload.GroupNodeID;
+    if (!Number.isInteger(groupId) || groupId <= 0) {
+      row.classList.add("error");
+      setMasterSettingsLegendsStatus(
+        translate(
+          "masterSettingsLegendsGroupRequired",
+          "Select a group node before saving."
+        ),
+        true
+      );
+      return;
+    }
+    row.classList.add("saving");
     button.disabled = true;
     setMasterSettingsLegendsStatus(translate("masterSettingsLegendsLoading"));
     try {
@@ -1446,6 +1510,7 @@ function initApp() {
       els.language.value = state.language;
     }
     applyDomTranslations();
+    ensureMasterSettingsGroupHeader();
     data.updateViewIndicator();
     renderSelections();
     renderLegendsPanel();
@@ -1873,6 +1938,7 @@ function initApp() {
     }
     state.language = els.language.value;
     applyLanguageChrome();
+    await loadMasterSettingsGroupNodes(true);
     renderMasterSettingsLegends();
     refreshMasterSettingsLegendsSummary();
     renderMasterSettingsRelations();
@@ -2187,7 +2253,11 @@ function initApp() {
 
   els.exportPng?.addEventListener("click", () => {
     if (!window.cy) return;
-    const png = window.cy.png({ full: true, scale: 2 });
+    const bg =
+      state.theme === "dark"
+        ? "#0f172a"
+        : "#ffffff";
+    const png = window.cy.png({ full: true, scale: 2, bg });
     const link = document.createElement("a");
     link.href = png;
     link.download = `graph-${Date.now()}.png`;
