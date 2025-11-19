@@ -283,6 +283,7 @@ function initApp() {
       return (
         info.groupNodeLabelAr ||
         info.groupNodeLabelEn ||
+        info.groupNodeLabel ||
         info.groupNodeTag ||
         null
       );
@@ -290,6 +291,7 @@ function initApp() {
     return (
       info.groupNodeLabelEn ||
       info.groupNodeLabelAr ||
+      info.groupNodeLabel ||
       info.groupNodeTag ||
       null
     );
@@ -2039,9 +2041,24 @@ function initApp() {
         groupNodeId: item.groupNodeId ?? item.GroupNodeID ?? null,
         groupNodeTag: item.groupNodeTag ?? item.GroupNodeTag ?? null,
         groupNodeLabelEn:
-          item.groupNodeLabelEn ?? item.GroupNodeEn ?? item.GroupNodeTag ?? null,
+          item.groupNodeLabelEn ??
+          item.GroupNodeEn ??
+          item.GroupNodeLabel ??
+          item.GroupNodeTag ??
+          null,
         groupNodeLabelAr:
-          item.groupNodeLabelAr ?? item.GroupNodeAr ?? item.GroupNodeTag ?? null,
+          item.groupNodeLabelAr ??
+          item.GroupNodeAr ??
+          item.GroupNodeLabel ??
+          item.GroupNodeTag ??
+          null,
+        groupNodeLabel:
+          item.groupNodeLabel ??
+          item.GroupNodeLabel ??
+          item.GroupNodeEn ??
+          item.GroupNodeAr ??
+          item.GroupNodeTag ??
+          null,
       };
       els.itemSearch.value = state.activeItem.text;
       data.hideSuggestions();
@@ -2088,6 +2105,7 @@ function initApp() {
             groupNodeTag: state.activeItem.groupNodeTag,
             groupNodeLabelEn: state.activeItem.groupNodeLabelEn,
             groupNodeLabelAr: state.activeItem.groupNodeLabelAr,
+            groupNodeLabel: state.activeItem.groupNodeLabel,
           }
         : getColumnGroupInfo(colId) || {};
 
@@ -2100,6 +2118,7 @@ function initApp() {
       groupNodeTag: groupInfo?.groupNodeTag ?? null,
       groupNodeLabelEn: groupInfo?.groupNodeLabelEn ?? null,
       groupNodeLabelAr: groupInfo?.groupNodeLabelAr ?? null,
+      groupNodeLabel: groupInfo?.groupNodeLabel ?? null,
     });
 
     state.activeItem = null;
@@ -2233,7 +2252,7 @@ function initApp() {
             nodeId: sel.id,
             groupNodeId: groupInfo?.groupNodeId ?? null,
             groupNodeTag: groupInfo?.groupNodeTag ?? null,
-            groupNodeLabel: resolveGroupLabel(groupInfo),
+            groupNodeLabel: groupInfo?.groupNodeLabel ?? resolveGroupLabel(groupInfo),
             roles: [],
           },
         };
@@ -2306,7 +2325,7 @@ function initApp() {
                 seed: false,
                 groupNodeId: groupInfo?.groupNodeId ?? null,
                 groupNodeTag: groupInfo?.groupNodeTag ?? null,
-                groupNodeLabel: resolveGroupLabel(groupInfo),
+            groupNodeLabel: groupInfo?.groupNodeLabel ?? resolveGroupLabel(groupInfo),
                 meta: { ...row, entityLabel, roles: [] },
               },
             };

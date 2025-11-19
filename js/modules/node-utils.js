@@ -31,40 +31,34 @@
 
   function buildGradient(primaryColor, roles) {
     if (!roles || roles.length <= 1) {
-      return {
-        colors: `${primaryColor} ${primaryColor}`,
-        positions: "0% 100%",
-      };
+      return `radial-gradient(circle, ${primaryColor} 0%, ${primaryColor} 100%)`;
     }
-    const colors = [primaryColor, primaryColor];
-    const positions = ["0%", "65%"];
+    const baseRadius = 55;
+    const gapSize = 2;
     const ringCount = roles.length - 1;
-    const available = 30;
-    const thickness = Math.max(3, available / ringCount);
-    let cursor = 65;
+    const available = Math.max(10, 45 - gapSize * (ringCount - 1));
+    const thickness = Math.max(5, available / ringCount);
+
+    const stops = [
+      `${primaryColor} 0%`,
+      `${primaryColor} ${baseRadius}%`,
+    ];
+    let cursor = baseRadius;
+
     roles.slice(1).forEach((role, index) => {
       const ringColor = normalizeColor(role.color, primaryColor);
-      const ringStart = Math.min(99, cursor + 1);
-      const ringEnd = Math.min(100, ringStart + thickness);
-      colors.push(ringColor, ringColor);
-      positions.push(`${ringStart}%`, `${ringEnd}%`);
+      const spacerStart = Math.min(99, cursor + gapSize);
+      stops.push(`${primaryColor} ${cursor}%`, `${primaryColor} ${spacerStart}%`);
+      const ringStart = spacerStart;
+      const ringEnd = Math.min(99.9, ringStart + thickness);
+      stops.push(`${ringColor} ${ringStart}%`, `${ringColor} ${ringEnd}%`);
       cursor = ringEnd;
-      if (index < ringCount - 1) {
-        const spacerStart = Math.min(99, cursor + 0.5);
-        const spacerEnd = Math.min(100, spacerStart + 0.5);
-        colors.push(primaryColor, primaryColor);
-        positions.push(`${spacerStart}%`, `${spacerEnd}%`);
-        cursor = spacerEnd;
+      if (index === ringCount - 1) {
+        stops.push(`${primaryColor} ${cursor}%`, `${primaryColor} 100%`);
       }
     });
-    if (positions[positions.length - 1] !== "100%") {
-      colors.push(primaryColor);
-      positions.push("100%");
-    }
-    return {
-      colors: colors.join(" "),
-      positions: positions.join(" "),
-    };
+
+    return `radial-gradient(circle, ${stops.join(", ")})`;
   }
 
   function applyRoleVisuals(nodeData, defaultColor) {
@@ -75,9 +69,7 @@
     nodeData.color = nodeData.primaryColor;
     nodeData.type = primary?.key || nodeData.type || "";
     nodeData.roleKeys = roles.map((role) => role.key);
-    const gradient = buildGradient(nodeData.primaryColor, roles);
-    nodeData.ringGradientColors = gradient.colors;
-    nodeData.ringGradientStops = gradient.positions;
+    nodeData.backgroundImage = buildGradient(nodeData.primaryColor, roles);
   }
 
   function mergeRole(nodeData, role, defaultColor) {
