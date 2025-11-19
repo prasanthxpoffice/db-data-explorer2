@@ -1,5 +1,46 @@
 (function (window) {
   const GraphApp = (window.GraphApp = window.GraphApp || {});
+  const NodeUtils = GraphApp.NodeUtils || {};
+  const buildNodeKey =
+    NodeUtils.buildNodeKey ||
+    (({ groupNodeId, entityId, columnId }) => {
+      const id = `${entityId ?? ""}`.trim();
+      if (groupNodeId && id) {
+        return `group:${groupNodeId}:${id}`;
+      }
+      const col = `${columnId ?? ""}`.trim();
+      return `${col}:${id}`;
+    });
+  const buildRole =
+    NodeUtils.buildRole ||
+    ((colId, label, color) => ({
+      colId,
+      key: (colId || "").trim().toLowerCase(),
+      label,
+      color,
+    }));
+  const mergeRole =
+    NodeUtils.mergeRole ||
+    ((nodeData, role, defaultColor) => {
+      if (!nodeData.meta) nodeData.meta = {};
+      if (!Array.isArray(nodeData.meta.roles)) {
+        nodeData.meta.roles = [];
+      }
+      const existing = nodeData.meta.roles.find((r) => r.key === role.key);
+      if (!existing) {
+        nodeData.meta.roles.push({ ...role });
+      }
+      if (!nodeData.primaryColor) {
+        nodeData.primaryColor = defaultColor;
+      }
+    });
+  const applyRoleVisuals =
+    NodeUtils.applyRoleVisuals ||
+    ((nodeData, defaultColor) => {
+      nodeData.primaryColor = nodeData.color || defaultColor;
+      nodeData.ringGradientColors = `${nodeData.primaryColor} ${nodeData.primaryColor}`;
+      nodeData.ringGradientStops = "0% 100%";
+    });
 
   GraphApp.createGraphModule = function ({
     state,
@@ -16,7 +57,7 @@
     onNodeSelected,
     onEdgeSelected,
     onGraphCleared,
-    onElementsAdded,
+    onElementsAdded
   }) {
     let cy = null;
     const expandedNodes = new Set();
@@ -69,8 +110,12 @@
 
     function isLegendVisible(node) {
       if (!legendFilterFn || !node) return true;
+      const roleKeys = node.data("roleKeys");
+      if (Array.isArray(roleKeys) && roleKeys.length) {
+        return legendFilterFn(roleKeys);
+      }
       const typeKey = (node.data("type") || "").toLowerCase();
-      return legendFilterFn(typeKey);
+      return legendFilterFn([typeKey]);
     }
 
     function applyLegendFilter() {
@@ -203,24 +248,43 @@
       { force = false, reason = "expand" } = {}
     ) {
       if (!cy) return false;
+      const sourceNode = cy.getElementById(sourceKey);
+      if (!sourceNode || !sourceNode.length) return false;
       if (!force && expandedNodes.has(sourceKey)) return false;
-      const parsed = (sourceKey || "").split(":");
-      if (parsed.length !== 2) {
-        expandedNodes.add(sourceKey);
-        return false;
-      }
-      const [colId, nodeId] = parsed;
-      const baseDepth = autoExpandLevels.get(sourceKey) ?? 0;
+      const nodeData = sourceNode.data();
+      const entityId =
+        nodeData.entityId ||
+        nodeData.meta?.nodeId ||
+        nodeData.meta?.sourceId ||
+        "";
+      if (!entityId) return false;
+      const groupNodeId =
+        nodeData.groupNodeId || nodeData.meta?.groupNodeId || null;
+      const primaryRole = (nodeData.meta?.roles || [])[0];
+      const sourceColId =
+        primaryRole?.colId || nodeData.type || nodeData.meta?.columnId || "";
       const filterPayload =
         typeof getLegendFilters === "function" ? getLegendFilters() : [];
       const rows = await callApi("expand", {
         viewIds: state.viewIds,
-        sourceColId: colId,
-        sourceId: nodeId,
+        sourceColId,
+        sourceId: entityId,
+        groupNodeId,
         maxNodes: getMaxNodes(),
         filters: filterPayload,
       }).then(unwrapData);
+      const result = processExpansionRows(rows, {
+        sourceKey: sourceNode.id(),
+        sourceColId,
+        sourceId: entityId,
+        reason,
+      });
+      expandedNodes.add(sourceNode.id());
+      return result.added;
+    }
 
+    function processExpansionRows(rows, context) {
+      const baseDepth = autoExpandLevels.get(context.sourceKey) ?? 0;
       const nodesToAdd = [];
       const edgesToAdd = [];
 
@@ -232,51 +296,81 @@
           row.edgeLabel ?? row.EdgeLabel ?? row.ed_r_ed ?? row.ED_R_ED ?? "";
         const direction = row.direction ?? row.Direction ?? "";
         const color = row.color ?? row.Color ?? DEFAULT_NODE_COLOR;
-        const { sourceArrow, targetArrow } = deriveArrows(direction);
-
+        const groupNodeId =
+          row.groupNodeId ?? row.GroupNodeID ?? row.group_node_id ?? null;
         const entityLabel = getEntityLabel(displayCol);
-        const targetKey = `${displayCol}:${id}`;
+        const targetKey = buildNodeKey({
+          groupNodeId,
+          entityId: id,
+          columnId: displayCol,
+        });
         const nextDepth = baseDepth + 1;
-
         const existingNode = cy.getElementById(targetKey);
+
         if (existingNode && existingNode.length) {
-          if (!existingNode.data("color") && color) {
-            existingNode.data("color", color);
-          }
-          if (!existingNode.data("entityLabel")) {
-            existingNode.data("entityLabel", entityLabel);
-          }
-          if (!existingNode.data("meta")) {
-            existingNode.data("meta", { ...row, entityLabel });
-          } else if (!existingNode.data("meta").entityLabel) {
-            const updatedMeta = existingNode.data("meta");
-            updatedMeta.entityLabel = entityLabel;
-            existingNode.data("meta", updatedMeta);
-          }
+          const existingData = existingNode.data();
+          existingData.entityLabel = existingData.entityLabel || entityLabel;
+          const existingRoles = existingData.meta?.roles || [];
+          existingData.meta = { ...row, entityLabel, roles: existingRoles };
+          existingData.groupNodeId = existingData.groupNodeId || groupNodeId || null;
+          existingData.groupNodeTag =
+            existingData.groupNodeTag ||
+            row.groupNodeTag ||
+            row.GroupNodeTag ||
+            null;
+          existingData.groupNodeLabel =
+            existingData.groupNodeLabel ||
+            row.groupNodeLabel ||
+            row.GroupNodeLabel ||
+            null;
+          mergeRole(
+            existingData,
+            buildRole(displayCol, entityLabel, color),
+            DEFAULT_NODE_COLOR
+          );
+          applyRoleVisuals(existingData, DEFAULT_NODE_COLOR);
+          existingNode.data(existingData);
           const existingDepth = autoExpandLevels.get(targetKey);
           if (existingDepth === undefined || nextDepth < existingDepth) {
             autoExpandLevels.set(targetKey, nextDepth);
           }
         } else {
-          nodesToAdd.push({
-            data: {
-              id: targetKey,
-              type: displayCol,
-              label: text,
-              entityLabel,
-              color,
-              seed: false,
-              meta: { ...row, entityLabel },
-            },
-          });
+          const nodeData = {
+            id: targetKey,
+            entityId: id,
+            type: displayCol,
+            label: text,
+            entityLabel,
+            color,
+            primaryColor: color,
+            ringGradientColors: `${color} ${color}`,
+            ringGradientStops: "0% 100%",
+            seed: false,
+            groupNodeId,
+            groupNodeTag:
+              row.groupNodeTag ?? row.GroupNodeTag ?? row.group_node_tag ?? null,
+            groupNodeLabel:
+              row.groupNodeLabel ??
+              row.GroupNodeLabel ??
+              row.group_node_label ??
+              null,
+            meta: { ...row, entityLabel, roles: [] },
+          };
+          mergeRole(
+            nodeData,
+            buildRole(displayCol, entityLabel, color),
+            DEFAULT_NODE_COLOR
+          );
+          applyRoleVisuals(nodeData, DEFAULT_NODE_COLOR);
+          nodesToAdd.push({ data: nodeData });
           autoExpandLevels.set(targetKey, nextDepth);
         }
 
         const forwardEdge = cy.$(
-          `edge[source = "${sourceKey}"][target = "${targetKey}"]`
+          `edge[source = "${context.sourceKey}"][target = "${targetKey}"]`
         );
         const reverseEdge = cy.$(
-          `edge[source = "${targetKey}"][target = "${sourceKey}"]`
+          `edge[source = "${targetKey}"][target = "${context.sourceKey}"]`
         );
         const existingEdge =
           forwardEdge.length > 0
@@ -284,7 +378,6 @@
             : reverseEdge.length > 0
             ? reverseEdge
             : null;
-
         if (existingEdge && existingEdge.length) {
           const edgeEle = existingEdge[0];
           if (!edgeEle.data("label") && label) {
@@ -293,15 +386,16 @@
           if (!edgeEle.data("meta")) {
             edgeEle.data("meta", {
               ...row,
-              sourceColId: colId,
-              sourceId: nodeId,
+              sourceColId: context.sourceColId,
+              sourceId: context.sourceId,
             });
           }
         } else {
+          const { sourceArrow, targetArrow } = deriveArrows(direction);
           edgesToAdd.push({
             data: {
-              id: `${sourceKey}|${targetKey}|${direction || "none"}`,
-              source: sourceKey,
+              id: `${context.sourceKey}|${targetKey}|${direction || "none"}`,
+              source: context.sourceKey,
               target: targetKey,
               label,
               direction,
@@ -309,8 +403,8 @@
               targetArrow,
               meta: {
                 ...row,
-                sourceColId: colId,
-                sourceId: nodeId,
+                sourceColId: context.sourceColId,
+                sourceId: context.sourceId,
               },
             },
           });
@@ -333,13 +427,14 @@
         onElementsAdded({
           nodes: nodesToAdd.map(cloneElement).filter(Boolean),
           edges: edgesToAdd.map(cloneElement).filter(Boolean),
-          reason,
-          sourceId: sourceKey,
+          reason: context.reason,
+          sourceId: context.sourceKey,
         });
       }
 
-      expandedNodes.add(sourceKey);
-      return nodesToAdd.length > 0 || edgesToAdd.length > 0;
+      return {
+        added: nodesToAdd.length || edgesToAdd.length,
+      };
     }
 
     async function autoExpandPendingNodes(token) {
@@ -531,7 +626,10 @@
             color: palette.nodeText,
             "text-outline-color": palette.nodeOutline,
             "text-outline-width": palette.nodeOutlineWidth,
-            "background-color": "data(color)",
+            "background-color": "data(primaryColor)",
+            "background-fill": "radial-gradient",
+            "background-gradient-stop-colors": "data(ringGradientColors)",
+            "background-gradient-stop-positions": "data(ringGradientStops)",
             "border-width": 1,
             "border-color": palette.nodeBorder,
             width: 80,
@@ -731,18 +829,18 @@
     }
 
     return {
-      renderGraph,
-      replaceElements,
-      getElementsSnapshot,
-      clearGraph,
-      resetAutoExpandProgress,
-      queueAutoExpand,
-      updateLeafVisibility,
-      deriveArrows,
-      runLayout,
-      refreshStyle,
-      setLegendFilter,
-      applyLegendFilter,
+      renderGraph: renderGraph,
+      replaceElements: replaceElements,
+      getElementsSnapshot: getElementsSnapshot,
+      clearGraph: clearGraph,
+      resetAutoExpandProgress: resetAutoExpandProgress,
+      queueAutoExpand: queueAutoExpand,
+      updateLeafVisibility: updateLeafVisibility,
+      deriveArrows: deriveArrows,
+      runLayout: runLayout,
+      refreshStyle: refreshStyle,
+      setLegendFilter: setLegendFilter,
+      applyLegendFilter: applyLegendFilter
     };
   };
 })(window);

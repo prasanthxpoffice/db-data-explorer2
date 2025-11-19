@@ -1,5 +1,46 @@
 const DEFAULT_NODE_COLOR = "#87cefa";
 const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
+const NodeUtils = (window.GraphApp && window.GraphApp.NodeUtils) || {};
+const buildNodeKey =
+  NodeUtils.buildNodeKey ||
+  (({ groupNodeId, entityId, columnId }) => {
+    const id = `${entityId ?? ""}`.trim();
+    if (groupNodeId && id) {
+      return `group:${groupNodeId}:${id}`;
+    }
+    const col = `${columnId ?? ""}`.trim();
+    return `${col}:${id}`;
+  });
+const buildRole = NodeUtils.buildRole || ((colId, label, color) => ({
+  colId,
+  key: (colId || "").trim().toLowerCase(),
+  label,
+  color,
+}));
+const applyRoleIntoNodeFallback = (nodeData, role, defaultColor) => {
+  if (!nodeData.meta) nodeData.meta = {};
+  if (!Array.isArray(nodeData.meta.roles)) {
+    nodeData.meta.roles = [];
+  }
+  const existing = nodeData.meta.roles.find((r) => r.key === role.key);
+  if (!existing) {
+    nodeData.meta.roles.push({ ...role });
+  }
+  nodeData.primaryColor = nodeData.primaryColor || defaultColor;
+};
+const applyRoleVisuals =
+  NodeUtils.applyRoleVisuals ||
+  ((nodeData) => {
+    nodeData.primaryColor = nodeData.color || DEFAULT_NODE_COLOR;
+    nodeData.ringGradientColors = `${nodeData.primaryColor} ${nodeData.primaryColor}`;
+    nodeData.ringGradientStops = "0% 100%";
+  });
+const mergeRoleIntoNode =
+  NodeUtils.mergeRole ||
+  ((nodeData, role, defaultColor) => {
+    applyRoleIntoNodeFallback(nodeData, role, defaultColor);
+    applyRoleVisuals(nodeData);
+  });
 
 function escapeHtml(val = "") {
   return String(val)
@@ -186,6 +227,72 @@ function initApp() {
       return id === key;
     });
     return match ? match.label || match.Label || match.colId || colId : colId;
+  };
+
+  const getEntityColor = (colId) => {
+    const key = (colId || "").toLowerCase();
+    if (!key) return DEFAULT_NODE_COLOR;
+    const match = state.nodeTypes.find((nt) => {
+      const id = (nt.colId || nt.ColId || "").toLowerCase();
+      return id === key;
+    });
+    return (
+      match?.color ||
+      match?.Color ||
+      match?.columnColor ||
+      match?.ColumnColor ||
+      DEFAULT_NODE_COLOR
+    );
+  };
+
+  const getColumnGroupInfo = (colId) => {
+    const key = (colId || "").toLowerCase();
+    if (!key) return null;
+    const match = state.nodeTypes.find((nt) => {
+      const id = (nt.colId || nt.ColId || "").toLowerCase();
+      return id === key;
+    });
+    if (!match) return null;
+    return {
+      groupNodeId: match.groupNodeId ?? match.GroupNodeID ?? null,
+      groupNodeTag: match.groupNodeTag ?? match.GroupNodeTag ?? null,
+      groupNodeLabelEn:
+        match.groupNodeLabelEn ?? match.GroupNodeEn ?? match.GroupNodeTag ?? null,
+      groupNodeLabelAr:
+        match.groupNodeLabelAr ?? match.GroupNodeAr ?? match.GroupNodeTag ?? null,
+    };
+  };
+
+  const extractGroupInfoFromRow = (row) => {
+    if (!row) return null;
+    return {
+      groupNodeId:
+        row.groupNodeId ?? row.GroupNodeID ?? row.group_node_id ?? null,
+      groupNodeTag:
+        row.groupNodeTag ?? row.GroupNodeTag ?? row.group_node_tag ?? null,
+      groupNodeLabelEn:
+        row.groupNodeLabel ?? row.GroupNodeEn ?? row.group_node_label ?? null,
+      groupNodeLabelAr:
+        row.groupNodeLabelAr ?? row.GroupNodeAr ?? row.group_node_label_ar ?? null,
+    };
+  };
+
+  const resolveGroupLabel = (info) => {
+    if (!info) return null;
+    if (state.language === "ar") {
+      return (
+        info.groupNodeLabelAr ||
+        info.groupNodeLabelEn ||
+        info.groupNodeTag ||
+        null
+      );
+    }
+    return (
+      info.groupNodeLabelEn ||
+      info.groupNodeLabelAr ||
+      info.groupNodeTag ||
+      null
+    );
   };
 
   const rootEl = document.querySelector(".graph-app") || document.body;
@@ -466,7 +573,7 @@ function initApp() {
     onNodeSelected: handleNodeSelection,
     onEdgeSelected: infoPanel.renderEdgeInfo,
     onGraphCleared: infoPanel.reset,
-    onElementsAdded: handleElementsAdded,
+    onElementsAdded: handleElementsAdded
   });
 
   pathModule =
@@ -1387,7 +1494,10 @@ function initApp() {
   };
 
   if (typeof graph.setLegendFilter === "function") {
-    graph.setLegendFilter((key) => isLegendKeyActive(key));
+    graph.setLegendFilter((keys = []) => {
+      const list = Array.isArray(keys) ? keys : [keys];
+      return list.some((key) => isLegendKeyActive(key));
+    });
   }
   const buildLegendsViewKey = () =>
     state.viewIds.length
@@ -1926,6 +2036,12 @@ function initApp() {
       state.activeItem = {
         id: `${item.id ?? item.Id ?? ""}`,
         text: item.text ?? item.Text ?? "(no text)",
+        groupNodeId: item.groupNodeId ?? item.GroupNodeID ?? null,
+        groupNodeTag: item.groupNodeTag ?? item.GroupNodeTag ?? null,
+        groupNodeLabelEn:
+          item.groupNodeLabelEn ?? item.GroupNodeEn ?? item.GroupNodeTag ?? null,
+        groupNodeLabelAr:
+          item.groupNodeLabelAr ?? item.GroupNodeAr ?? item.GroupNodeTag ?? null,
       };
       els.itemSearch.value = state.activeItem.text;
       data.hideSuggestions();
@@ -1965,11 +2081,25 @@ function initApp() {
       return;
     }
 
+    const groupInfo =
+      state.activeItem.groupNodeId || state.activeItem.groupNodeTag
+        ? {
+            groupNodeId: state.activeItem.groupNodeId,
+            groupNodeTag: state.activeItem.groupNodeTag,
+            groupNodeLabelEn: state.activeItem.groupNodeLabelEn,
+            groupNodeLabelAr: state.activeItem.groupNodeLabelAr,
+          }
+        : getColumnGroupInfo(colId) || {};
+
     state.selected.push({
       colId,
       colLabel,
       id: state.activeItem.id,
       text: state.activeItem.text,
+      groupNodeId: groupInfo?.groupNodeId ?? null,
+      groupNodeTag: groupInfo?.groupNodeTag ?? null,
+      groupNodeLabelEn: groupInfo?.groupNodeLabelEn ?? null,
+      groupNodeLabelAr: groupInfo?.groupNodeLabelAr ?? null,
     });
 
     state.activeItem = null;
@@ -2058,41 +2188,74 @@ function initApp() {
       const nodes = new Map();
       const edges = new Map();
       const edgePairMap = new Map();
-      const nodeKey = (colId, id) => `${colId}:${id}`;
+      const selectionKeyMap = new Map();
       const undirectedKey = (a, b) => (a < b ? `${a}||${b}` : `${b}||${a}`);
 
       state.selected.forEach((sel) => {
-        const key = nodeKey(sel.colId, sel.id);
-        const fromDate = translate("anyValue");
-        const toDate = translate("anyValue");
-        const entityLabel = getEntityLabel(sel.colId);
-        nodes.set(key, {
-          data: {
-            id: key,
-            type: sel.colId,
-            label: sel.text,
-            entityLabel,
-            color: sel.color ?? DEFAULT_NODE_COLOR,
-            seed: true,
-            meta: {
-              source: "selection",
-              columnId: sel.colId,
-              columnLabel: sel.colLabel ?? sel.colId,
-              entityLabel,
-              nodeText: sel.text,
-              nodeId: sel.id,
-              fromDate,
-              toDate,
-            },
-          },
+        const baseKey = `${sel.colId}:${sel.id}`;
+        const columnGroupInfo = getColumnGroupInfo(sel.colId);
+        const groupInfo = sel.groupNodeId
+          ? {
+              groupNodeId: sel.groupNodeId,
+              groupNodeTag: sel.groupNodeTag,
+              groupNodeLabelEn: sel.groupNodeLabelEn,
+              groupNodeLabelAr: sel.groupNodeLabelAr,
+            }
+          : columnGroupInfo || {};
+        const resolvedKey = buildNodeKey({
+          groupNodeId: groupInfo?.groupNodeId,
+          entityId: sel.id,
+          columnId: sel.colId,
         });
+        selectionKeyMap.set(baseKey, resolvedKey);
+        const entityLabel = getEntityLabel(sel.colId);
+        const entityColor = getEntityColor(sel.colId);
+        const nodeData = {
+          id: resolvedKey,
+          entityId: sel.id,
+          type: sel.colId,
+          label: sel.text,
+          entityLabel,
+          color: entityColor,
+          primaryColor: entityColor,
+          ringGradientColors: `${entityColor} ${entityColor}`,
+          ringGradientStops: "0% 100%",
+          seed: true,
+          groupNodeId: groupInfo?.groupNodeId ?? null,
+          groupNodeTag: groupInfo?.groupNodeTag ?? null,
+          groupNodeLabel: resolveGroupLabel(groupInfo),
+          meta: {
+            source: "selection",
+            columnId: sel.colId,
+            columnLabel: sel.colLabel ?? sel.colId,
+            entityLabel,
+            nodeText: sel.text,
+            nodeId: sel.id,
+            groupNodeId: groupInfo?.groupNodeId ?? null,
+            groupNodeTag: groupInfo?.groupNodeTag ?? null,
+            groupNodeLabel: resolveGroupLabel(groupInfo),
+            roles: [],
+          },
+        };
+        const role = buildRole(sel.colId, sel.colLabel ?? sel.colId, entityColor);
+        mergeRoleIntoNode(nodeData, role, entityColor);
+        nodes.set(resolvedKey, { data: nodeData });
       });
 
       for (const sel of state.selected) {
+        const selectionKey = `${sel.colId}:${sel.id}`;
+        const sourceKey =
+          selectionKeyMap.get(selectionKey) ||
+          buildNodeKey({
+            groupNodeId: sel.groupNodeId,
+            entityId: sel.id,
+            columnId: sel.colId,
+          });
         const resp = await data.callApi("expand", {
           viewIds: state.viewIds,
           sourceColId: sel.colId,
           sourceId: sel.id,
+          groupNodeId: sel.groupNodeId ?? null,
           maxNodes: getMaxNodes(),
           filters: legendFilters,
         });
@@ -2107,38 +2270,65 @@ function initApp() {
           const direction = row.direction ?? row.Direction ?? "";
           const color = row.color ?? row.Color ?? DEFAULT_NODE_COLOR;
           const { sourceArrow, targetArrow } = graph.deriveArrows(direction);
-
-          const targetKey = nodeKey(displayCol, id);
           const entityLabel = getEntityLabel(displayCol);
-          if (!nodes.has(targetKey)) {
-            nodes.set(targetKey, {
+          const groupInfo = extractGroupInfoFromRow(row);
+          const targetKey = buildNodeKey({
+            groupNodeId: groupInfo?.groupNodeId,
+            entityId: id,
+            columnId: displayCol,
+          });
+          const fallbackTargetKey = buildNodeKey({
+            groupNodeId: null,
+            entityId: id,
+            columnId: displayCol,
+          });
+          let nodeEntry = nodes.get(targetKey);
+          if (!nodeEntry && targetKey !== fallbackTargetKey && nodes.has(fallbackTargetKey)) {
+            nodeEntry = nodes.get(fallbackTargetKey);
+            nodes.delete(fallbackTargetKey);
+            if (nodeEntry?.data) {
+              nodeEntry.data.id = targetKey;
+            }
+            nodes.set(targetKey, nodeEntry);
+          }
+          if (!nodeEntry) {
+            nodeEntry = {
               data: {
                 id: targetKey,
+                entityId: id,
                 type: displayCol,
                 label: text,
                 entityLabel,
                 color,
+                primaryColor: color,
+                ringGradientColors: `${color} ${color}`,
+                ringGradientStops: "0% 100%",
                 seed: false,
-                meta: { ...row, entityLabel },
+                groupNodeId: groupInfo?.groupNodeId ?? null,
+                groupNodeTag: groupInfo?.groupNodeTag ?? null,
+                groupNodeLabel: resolveGroupLabel(groupInfo),
+                meta: { ...row, entityLabel, roles: [] },
               },
-            });
+            };
+            nodes.set(targetKey, nodeEntry);
           } else {
-            const nodeData = nodes.get(targetKey).data || {};
+            const nodeData = nodeEntry.data;
+            const existingRoles = nodeData.meta?.roles || [];
+            nodeData.entityLabel = nodeData.entityLabel || entityLabel;
+            nodeData.meta = { ...row, entityLabel, roles: existingRoles };
+            nodeData.groupNodeId =
+              nodeData.groupNodeId || groupInfo?.groupNodeId || null;
+            nodeData.groupNodeTag =
+              nodeData.groupNodeTag || groupInfo?.groupNodeTag || null;
+            nodeData.groupNodeLabel =
+              nodeData.groupNodeLabel || resolveGroupLabel(groupInfo);
             if (!nodeData.color && color) {
               nodeData.color = color;
             }
-            if (!nodeData.meta) {
-              nodeData.meta = { ...row };
-            }
-            if (!nodeData.meta.entityLabel) {
-              nodeData.meta.entityLabel = entityLabel;
-            }
-            if (!nodeData.entityLabel) {
-              nodeData.entityLabel = entityLabel;
-            }
           }
+          const role = buildRole(displayCol, entityLabel, color);
+          mergeRoleIntoNode(nodeEntry.data, role, DEFAULT_NODE_COLOR);
 
-          const sourceKey = nodeKey(sel.colId, sel.id);
           const pairKey = undirectedKey(sourceKey, targetKey);
           const existingEdgeId = edgePairMap.get(pairKey);
           if (existingEdgeId) {
