@@ -29,36 +29,17 @@
     return nodeData.meta.roles;
   }
 
-  function buildGradient(primaryColor, roles) {
-    if (!roles || roles.length <= 1) {
-      return `radial-gradient(circle, ${primaryColor} 0%, ${primaryColor} 100%)`;
-    }
-    const baseRadius = 55;
-    const gapSize = 2;
-    const ringCount = roles.length - 1;
-    const available = Math.max(10, 45 - gapSize * (ringCount - 1));
-    const thickness = Math.max(5, available / ringCount);
+  const MAX_PIE_SLICES = 8;
 
-    const stops = [
-      `${primaryColor} 0%`,
-      `${primaryColor} ${baseRadius}%`,
-    ];
-    let cursor = baseRadius;
-
-    roles.slice(1).forEach((role, index) => {
-      const ringColor = normalizeColor(role.color, primaryColor);
-      const spacerStart = Math.min(99, cursor + gapSize);
-      stops.push(`${primaryColor} ${cursor}%`, `${primaryColor} ${spacerStart}%`);
-      const ringStart = spacerStart;
-      const ringEnd = Math.min(99.9, ringStart + thickness);
-      stops.push(`${ringColor} ${ringStart}%`, `${ringColor} ${ringEnd}%`);
-      cursor = ringEnd;
-      if (index === ringCount - 1) {
-        stops.push(`${primaryColor} ${cursor}%`, `${primaryColor} 100%`);
-      }
+  function buildPieSlices(primaryColor, roles) {
+    const normalizedRoles = roles && roles.length ? roles : [{ color: primaryColor }];
+    const limited = normalizedRoles.slice(0, MAX_PIE_SLICES);
+    const share = limited.length ? 100 / limited.length : 100;
+    const slices = [];
+    limited.forEach((role) => {
+      slices.push({ color: normalizeColor(role.color, primaryColor), size: share });
     });
-
-    return `radial-gradient(circle, ${stops.join(", ")})`;
+    return slices;
   }
 
   function applyRoleVisuals(nodeData, defaultColor) {
@@ -69,7 +50,12 @@
     nodeData.color = nodeData.primaryColor;
     nodeData.type = primary?.key || nodeData.type || "";
     nodeData.roleKeys = roles.map((role) => role.key);
-    nodeData.backgroundImage = buildGradient(nodeData.primaryColor, roles);
+    const slices = buildPieSlices(nodeData.primaryColor, roles);
+    for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
+      const slice = slices[i - 1];
+      nodeData[`pie${i}Color`] = slice ? slice.color : nodeData.primaryColor;
+      nodeData[`pie${i}Size`] = slice ? slice.size : 0;
+    }
   }
 
   function mergeRole(nodeData, role, defaultColor) {

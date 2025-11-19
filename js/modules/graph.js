@@ -1,6 +1,7 @@
 (function (window) {
   const GraphApp = (window.GraphApp = window.GraphApp || {});
   const NodeUtils = GraphApp.NodeUtils || {};
+  const MAX_PIE_SLICES = 8;
   const buildNodeKey =
     NodeUtils.buildNodeKey ||
     (({ groupNodeId, entityId, columnId }) => {
@@ -30,16 +31,22 @@
       if (!existing) {
         nodeData.meta.roles.push({ ...role });
       }
-      if (!nodeData.primaryColor) {
-        nodeData.primaryColor = defaultColor;
-      }
+      applyRoleVisuals(nodeData, defaultColor);
     });
   const applyRoleVisuals =
     NodeUtils.applyRoleVisuals ||
     ((nodeData, defaultColor) => {
+      const roles = nodeData.meta?.roles || [];
       nodeData.primaryColor = nodeData.color || defaultColor;
-      nodeData.ringGradientColors = `${nodeData.primaryColor} ${nodeData.primaryColor}`;
-      nodeData.ringGradientStops = "0% 100%";
+      nodeData.color = nodeData.primaryColor;
+      const slices = roles.length ? roles : [{ color: nodeData.primaryColor }];
+      const limited = slices.slice(0, MAX_PIE_SLICES);
+      const share = limited.length ? 100 / limited.length : 100;
+      for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
+        const slice = limited[i - 1];
+        nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
+        nodeData[`pie${i}Size`] = slice ? share : 0;
+      }
     });
 
   GraphApp.createGraphModule = function ({
@@ -343,8 +350,6 @@
             entityLabel,
             color,
             primaryColor: color,
-            ringGradientColors: `${color} ${color}`,
-            ringGradientStops: "0% 100%",
             seed: false,
             groupNodeId,
             groupNodeTag:
@@ -627,8 +632,23 @@
             "text-outline-color": palette.nodeOutline,
             "text-outline-width": palette.nodeOutlineWidth,
             "background-color": "data(primaryColor)",
-            "background-image": "data(backgroundImage)",
-            "background-fit": "cover cover",
+            "pie-size": "90%",
+            "pie-1-background-color": "data(pie1Color)",
+            "pie-1-background-size": "data(pie1Size)",
+            "pie-2-background-color": "data(pie2Color)",
+            "pie-2-background-size": "data(pie2Size)",
+            "pie-3-background-color": "data(pie3Color)",
+            "pie-3-background-size": "data(pie3Size)",
+            "pie-4-background-color": "data(pie4Color)",
+            "pie-4-background-size": "data(pie4Size)",
+            "pie-5-background-color": "data(pie5Color)",
+            "pie-5-background-size": "data(pie5Size)",
+            "pie-6-background-color": "data(pie6Color)",
+            "pie-6-background-size": "data(pie6Size)",
+            "pie-7-background-color": "data(pie7Color)",
+            "pie-7-background-size": "data(pie7Size)",
+            "pie-8-background-color": "data(pie8Color)",
+            "pie-8-background-size": "data(pie8Size)",
             "border-width": 1,
             "border-color": palette.nodeBorder,
             width: 80,

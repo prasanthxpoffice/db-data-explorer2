@@ -1,6 +1,7 @@
 const DEFAULT_NODE_COLOR = "#87cefa";
 const DEFAULT_DATE_SENTINELS = new Set(["1900-01-01", "2100-12-31"]);
 const NodeUtils = (window.GraphApp && window.GraphApp.NodeUtils) || {};
+const MAX_PIE_SLICES = 8;
 const buildNodeKey =
   NodeUtils.buildNodeKey ||
   (({ groupNodeId, entityId, columnId }) => {
@@ -17,29 +18,44 @@ const buildRole = NodeUtils.buildRole || ((colId, label, color) => ({
   label,
   color,
 }));
-const applyRoleIntoNodeFallback = (nodeData, role, defaultColor) => {
+
+const applyRoleVisualsFallback = (nodeData, defaultColor = DEFAULT_NODE_COLOR) => {
   if (!nodeData.meta) nodeData.meta = {};
   if (!Array.isArray(nodeData.meta.roles)) {
     nodeData.meta.roles = [];
   }
-  const existing = nodeData.meta.roles.find((r) => r.key === role.key);
-  if (!existing) {
-    nodeData.meta.roles.push({ ...role });
+  const roles = nodeData.meta.roles.length
+    ? nodeData.meta.roles
+    : [{ color: defaultColor }];
+  nodeData.primaryColor = nodeData.color || defaultColor;
+  nodeData.color = nodeData.primaryColor;
+  const limited = roles.slice(0, MAX_PIE_SLICES);
+  const share = limited.length ? 100 / limited.length : 100;
+  for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
+    const slice = limited[i - 1];
+    nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
+    nodeData[`pie${i}Size`] = slice ? share : 0;
   }
-  nodeData.primaryColor = nodeData.primaryColor || defaultColor;
 };
+
 const applyRoleVisuals =
   NodeUtils.applyRoleVisuals ||
-  ((nodeData) => {
-    nodeData.primaryColor = nodeData.color || DEFAULT_NODE_COLOR;
-    nodeData.ringGradientColors = `${nodeData.primaryColor} ${nodeData.primaryColor}`;
-    nodeData.ringGradientStops = "0% 100%";
+  ((nodeData, defaultColor) => {
+    applyRoleVisualsFallback(nodeData, defaultColor);
   });
+
 const mergeRoleIntoNode =
   NodeUtils.mergeRole ||
   ((nodeData, role, defaultColor) => {
-    applyRoleIntoNodeFallback(nodeData, role, defaultColor);
-    applyRoleVisuals(nodeData);
+    if (!nodeData.meta) nodeData.meta = {};
+    if (!Array.isArray(nodeData.meta.roles)) {
+      nodeData.meta.roles = [];
+    }
+    const existing = nodeData.meta.roles.find((r) => r.key === role.key);
+    if (!existing) {
+      nodeData.meta.roles.push({ ...role });
+    }
+    applyRoleVisualsFallback(nodeData, defaultColor);
   });
 
 function escapeHtml(val = "") {
@@ -2237,8 +2253,6 @@ function initApp() {
           entityLabel,
           color: entityColor,
           primaryColor: entityColor,
-          ringGradientColors: `${entityColor} ${entityColor}`,
-          ringGradientStops: "0% 100%",
           seed: true,
           groupNodeId: groupInfo?.groupNodeId ?? null,
           groupNodeTag: groupInfo?.groupNodeTag ?? null,
@@ -2320,8 +2334,6 @@ function initApp() {
                 entityLabel,
                 color,
                 primaryColor: color,
-                ringGradientColors: `${color} ${color}`,
-                ringGradientStops: "0% 100%",
                 seed: false,
                 groupNodeId: groupInfo?.groupNodeId ?? null,
                 groupNodeTag: groupInfo?.groupNodeTag ?? null,
