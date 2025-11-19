@@ -20,9 +20,12 @@
       label,
       color,
     }));
+  const legendKey =
+    NodeUtils.legendKey ||
+    ((value) => (value || "").trim().toLowerCase());
   const mergeRole =
     NodeUtils.mergeRole ||
-    ((nodeData, role, defaultColor) => {
+    ((nodeData, role, defaultColor, options = {}) => {
       if (!nodeData.meta) nodeData.meta = {};
       if (!Array.isArray(nodeData.meta.roles)) {
         nodeData.meta.roles = [];
@@ -31,22 +34,37 @@
       if (!existing) {
         nodeData.meta.roles.push({ ...role });
       }
-      applyRoleVisuals(nodeData, defaultColor);
+      applyRoleVisuals(nodeData, defaultColor, options);
     });
   const applyRoleVisuals =
     NodeUtils.applyRoleVisuals ||
-    ((nodeData, defaultColor) => {
+    ((nodeData, defaultColor, options = {}) => {
       const roles = nodeData.meta?.roles || [];
       nodeData.primaryColor = nodeData.color || defaultColor;
       nodeData.color = nodeData.primaryColor;
       const slices = roles.length ? roles : [{ color: nodeData.primaryColor }];
       const limited = slices.slice(0, MAX_PIE_SLICES);
-      const share = limited.length ? 100 / limited.length : 100;
+      const flags = limited.map((role) => {
+        if (typeof options.filterFn !== "function") return true;
+        try {
+          return !!options.filterFn(role);
+        } catch (err) {
+          console.warn("Legend role filter (graph fallback) failed", err);
+          return true;
+        }
+      });
+      const activeCount = roles.length ? flags.filter(Boolean).length : 1;
+      const share = activeCount ? 100 / activeCount : 0;
       for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
         const slice = limited[i - 1];
+        const flag = flags[i - 1];
         nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
-        nodeData[`pie${i}Size`] = slice ? share : 0;
+        nodeData[`pie${i}Size`] = slice && flag ? share : 0;
       }
+      nodeData.roleCount = roles.length;
+      nodeData.activeRoleCount = roles.length ? activeCount : 1;
+      nodeData.roleKeys = roles.map((role) => role.key || "");
+      return nodeData.activeRoleCount;
     });
 
   GraphApp.createGraphModule = function ({
@@ -115,21 +133,56 @@
       }
     }
 
-    function isLegendVisible(node) {
-      if (!legendFilterFn || !node) return true;
+    function getLegendControls() {
+      return (state && state.legendControls) || {};
+    }
+
+    function isLegendRoleActive(rawKey) {
+      const key = legendKey(rawKey);
+      if (!key) return true;
+      const controls = getLegendControls();
+      const entry = controls[key];
+      if (!entry) return true;
+      return entry.active !== false;
+    }
+
+    function buildLegendRoleFilter() {
+      return (role) => {
+        if (!role) return true;
+        if (typeof role === "string") {
+          return isLegendRoleActive(role);
+        }
+        const key = role.key || role.colId || role.columnId || role.ColumnId || "";
+        return isLegendRoleActive(key);
+      };
+    }
+
+    function isLegendVisible(node, activeRoleCountOverride) {
+      if (!node) return true;
       const roleKeys = node.data("roleKeys");
       if (Array.isArray(roleKeys) && roleKeys.length) {
-        return legendFilterFn(roleKeys);
+        if (typeof activeRoleCountOverride === "number") {
+          return activeRoleCountOverride > 0;
+        }
+        return roleKeys.some((key) => isLegendRoleActive(key));
       }
+      if (!legendFilterFn) return true;
       const typeKey = (node.data("type") || "").toLowerCase();
       return legendFilterFn([typeKey]);
     }
 
     function applyLegendFilter() {
       if (!cy) return;
+      const roleFilter = buildLegendRoleFilter();
       cy.batch(() => {
         cy.nodes().forEach((node) => {
-          const visible = isLegendVisible(node);
+          const data = node.data();
+          const activeCount =
+            applyRoleVisuals(data, DEFAULT_NODE_COLOR, { filterFn: roleFilter }) ??
+            data.activeRoleCount ??
+            1;
+          node.data(data);
+          const visible = isLegendVisible(node, activeCount);
           node.toggleClass("legend-hidden", !visible);
         });
         cy.edges().forEach((edge) => {

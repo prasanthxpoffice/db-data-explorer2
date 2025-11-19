@@ -31,18 +31,36 @@
 
   const MAX_PIE_SLICES = 8;
 
-  function buildPieSlices(primaryColor, roles) {
-    const normalizedRoles = roles && roles.length ? roles : [{ color: primaryColor }];
-    const limited = normalizedRoles.slice(0, MAX_PIE_SLICES);
-    const share = limited.length ? 100 / limited.length : 100;
-    const slices = [];
-    limited.forEach((role) => {
-      slices.push({ color: normalizeColor(role.color, primaryColor), size: share });
+  function buildPieSlices(primaryColor, roles, filterFn) {
+    if (!roles || roles.length === 0) {
+      return {
+        slices: [{ color: primaryColor, size: 100 }],
+        activeCount: 1,
+        total: 0,
+      };
+    }
+    const limited = roles.slice(0, MAX_PIE_SLICES);
+    const flags = limited.map((role) => {
+      if (typeof filterFn !== "function") {
+        return true;
+      }
+      try {
+        return !!filterFn(role);
+      } catch (err) {
+        console.warn("Role filter error", err);
+        return true;
+      }
     });
-    return slices;
+    const activeCount = flags.filter(Boolean).length;
+    const share = activeCount ? 100 / activeCount : 0;
+    const slices = limited.map((role, index) => ({
+      color: normalizeColor(role.color, primaryColor),
+      size: flags[index] ? share : 0,
+    }));
+    return { slices, activeCount, total: roles.length };
   }
 
-  function applyRoleVisuals(nodeData, defaultColor) {
+  function applyRoleVisuals(nodeData, defaultColor, options = {}) {
     const roles = nodeData.meta?.roles || [];
     const primary = roles[0];
     const primaryColor = normalizeColor(primary?.color, defaultColor);
@@ -50,15 +68,27 @@
     nodeData.color = nodeData.primaryColor;
     nodeData.type = primary?.key || nodeData.type || "";
     nodeData.roleKeys = roles.map((role) => role.key);
-    const slices = buildPieSlices(nodeData.primaryColor, roles);
+    const baseLabel =
+      nodeData.baseLabel || nodeData.label || nodeData.text || nodeData.labelBase || "";
+    nodeData.baseLabel = baseLabel;
+    const { slices, activeCount, total } = buildPieSlices(
+      nodeData.primaryColor,
+      roles,
+      options.filterFn
+    );
     for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
       const slice = slices[i - 1];
       nodeData[`pie${i}Color`] = slice ? slice.color : nodeData.primaryColor;
       nodeData[`pie${i}Size`] = slice ? slice.size : 0;
     }
+    nodeData.roleCount = roles.length;
+    nodeData.activeRoleCount = roles.length ? activeCount : 1;
+    nodeData.displayLabel =
+      roles.length > 1 ? `${baseLabel}\n(+${roles.length - 1})` : baseLabel;
+    return nodeData.activeRoleCount;
   }
 
-  function mergeRole(nodeData, role, defaultColor) {
+  function mergeRole(nodeData, role, defaultColor, options = {}) {
     const roles = ensureRolesContainer(nodeData);
     const key = role.key;
     const existing = roles.find((r) => r.key === key);
@@ -73,7 +103,7 @@
         color: role.color,
       });
     }
-    applyRoleVisuals(nodeData, defaultColor);
+    applyRoleVisuals(nodeData, defaultColor, options);
   }
 
   GraphApp.NodeUtils = {

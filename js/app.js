@@ -19,7 +19,11 @@ const buildRole = NodeUtils.buildRole || ((colId, label, color) => ({
   color,
 }));
 
-const applyRoleVisualsFallback = (nodeData, defaultColor = DEFAULT_NODE_COLOR) => {
+const applyRoleVisualsFallback = (
+  nodeData,
+  defaultColor = DEFAULT_NODE_COLOR,
+  options = {}
+) => {
   if (!nodeData.meta) nodeData.meta = {};
   if (!Array.isArray(nodeData.meta.roles)) {
     nodeData.meta.roles = [];
@@ -29,24 +33,39 @@ const applyRoleVisualsFallback = (nodeData, defaultColor = DEFAULT_NODE_COLOR) =
     : [{ color: defaultColor }];
   nodeData.primaryColor = nodeData.color || defaultColor;
   nodeData.color = nodeData.primaryColor;
+  nodeData.roleKeys = roles.map((role) => role.key || "");
   const limited = roles.slice(0, MAX_PIE_SLICES);
-  const share = limited.length ? 100 / limited.length : 100;
+  const flags = limited.map((role) => {
+    if (typeof options.filterFn !== "function") return true;
+    try {
+      return !!options.filterFn(role);
+    } catch (err) {
+      console.warn("Role filter fallback error", err);
+      return true;
+    }
+  });
+  const activeCount = roles.length ? flags.filter(Boolean).length : 1;
+  const share = activeCount ? 100 / activeCount : 0;
   for (let i = 1; i <= MAX_PIE_SLICES; i += 1) {
     const slice = limited[i - 1];
+    const flag = flags[i - 1];
     nodeData[`pie${i}Color`] = slice ? slice.color || nodeData.primaryColor : nodeData.primaryColor;
-    nodeData[`pie${i}Size`] = slice ? share : 0;
+    nodeData[`pie${i}Size`] = slice && flag ? share : 0;
   }
+  nodeData.roleCount = roles.length;
+  nodeData.activeRoleCount = roles.length ? activeCount : 1;
+  return nodeData.activeRoleCount;
 };
 
 const applyRoleVisuals =
   NodeUtils.applyRoleVisuals ||
-  ((nodeData, defaultColor) => {
-    applyRoleVisualsFallback(nodeData, defaultColor);
+  ((nodeData, defaultColor, options) => {
+    return applyRoleVisualsFallback(nodeData, defaultColor, options);
   });
 
 const mergeRoleIntoNode =
   NodeUtils.mergeRole ||
-  ((nodeData, role, defaultColor) => {
+  ((nodeData, role, defaultColor, options) => {
     if (!nodeData.meta) nodeData.meta = {};
     if (!Array.isArray(nodeData.meta.roles)) {
       nodeData.meta.roles = [];
@@ -55,7 +74,7 @@ const mergeRoleIntoNode =
     if (!existing) {
       nodeData.meta.roles.push({ ...role });
     }
-    applyRoleVisualsFallback(nodeData, defaultColor);
+    applyRoleVisualsFallback(nodeData, defaultColor, options);
   });
 
 function escapeHtml(val = "") {
