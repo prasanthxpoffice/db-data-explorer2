@@ -11,3 +11,5 @@ server-dotnet/obj/
 
 static-server/bin/
 static-server/obj/
+
+server-mvc-dotnet/bin/

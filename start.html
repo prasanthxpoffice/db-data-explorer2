@@ -20,8 +20,16 @@
   </head>
   <body>
     <script>
+      const params = new URLSearchParams(window.location.search);
+      const storedBaseUrl = localStorage.getItem("graphApiBase");
+      const queryBaseUrl = params.get("apiBase");
+      const resolvedBaseUrl =
+        (queryBaseUrl && queryBaseUrl.trim()) ||
+        (storedBaseUrl && storedBaseUrl.trim()) ||
+        "http://localhost:5050";
+
       window.APP_CONFIG = {
-        baseUrl: "http://localhost:5050",
+        baseUrl: resolvedBaseUrl,
         api: {
           views: { path: "/graphapi/views", method: "GET" },
           nodeTypes: { path: "/graphapi/node-types", method: "POST" },
@@ -59,6 +67,7 @@
         showTimelineButton: false,
         userId: "demo-user",
       };
+      localStorage.setItem("graphApiBase", resolvedBaseUrl);
       localStorage.setItem("graphConfig", window.APP_CONFIG);
     </script>
 
