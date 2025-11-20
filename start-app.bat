@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 set "SERVER_DIR=%~dp0server-dotnet"
 set "SERVER_URL=http://localhost:5050"
-set "INDEX_FILE=%~dp0index.html"
+set "INDEX_FILE=%~dp0start.html"
 set "FRONTEND_URL=%SERVER_URL%/"
 
 echo Starting .NET server from "%SERVER_DIR%" on %SERVER_URL% ...
