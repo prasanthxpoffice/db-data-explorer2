@@ -5,7 +5,8 @@
     <title>Graph</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
-      html, body {
+      html,
+      body {
         height: 100%;
         margin: 0;
       }
@@ -18,40 +19,49 @@
     </style>
   </head>
   <body>
-
     <script>
-
       window.APP_CONFIG = {
-      baseUrl: "http://localhost:5050",
-      api: {
-        views: { path: "/views", method: "GET" },
-        nodeTypes: { path: "/node-types", method: "POST" },
-        legends: { path: "/node-legends", method: "POST" },
-        items: { path: "/items", method: "POST" },
-        expand: { path: "/expand", method: "POST" },
-        masterNodes: { path: "/master-nodes", method: "GET" },
-        groupNodes: { path: "/group-nodes", method: "GET" },
-        updateMasterNode: { path: "/master-nodes/update", method: "POST" },
-        masterRelations: { path: "/master-relations", method: "GET" },
-        saveRelation: { path: "/master-relations/save", method: "POST" },
-        deleteRelation: { path: "/master-relations/delete", method: "POST" },
-      },
-      defaults: {
-        maxItems: 20,
-        maxNodes: 200,
-        autoExpandDepth: 1,
-        autoExpandMinDepth: 1,
-        autoExpandMaxDepth: 12,
-      },
-      defaultLang: "en",
-      showLanguageSelector: true,
-      showTimelineButton: false,
-      userId: "demo-user",
-    };
-    localStorage.setItem('graphConfig',window.APP_CONFIG);
+        baseUrl: "http://localhost:5050",
+        api: {
+          views: { path: "/graphapi/views", method: "GET" },
+          nodeTypes: { path: "/graphapi/node-types", method: "POST" },
+          legends: { path: "/graphapi/node-legends", method: "POST" },
+          items: { path: "/graphapi/items", method: "POST" },
+          expand: { path: "/graphapi/expand", method: "POST" },
+          masterNodes: { path: "/graphapi/master-nodes", method: "GET" },
+          groupNodes: { path: "/graphapi/group-nodes", method: "GET" },
+          updateMasterNode: {
+            path: "/graphapi/master-nodes/update",
+            method: "POST",
+          },
+          masterRelations: {
+            path: "/graphapi/master-relations",
+            method: "GET",
+          },
+          saveRelation: {
+            path: "/graphapi/master-relations/save",
+            method: "POST",
+          },
+          deleteRelation: {
+            path: "/graphapi/master-relations/delete",
+            method: "POST",
+          },
+        },
+        defaults: {
+          maxItems: 20,
+          maxNodes: 200,
+          autoExpandDepth: 1,
+          autoExpandMinDepth: 1,
+          autoExpandMaxDepth: 12,
+        },
+        defaultLang: "en",
+        showLanguageSelector: true,
+        showTimelineButton: false,
+        userId: "demo-user",
+      };
+      localStorage.setItem("graphConfig", window.APP_CONFIG);
     </script>
 
     <iframe src="index.html"></iframe>
-
   </body>
 </html>

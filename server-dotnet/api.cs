@@ -34,9 +34,11 @@ var app = builder.Build();
 
 app.UseCors();
 
+var graphApi = app.MapGroup("/graphapi");
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTimeOffset.UtcNow }));
 
-app.MapGet("/views", async Task<IResult> (
+graphApi.MapGet("/views", async Task<IResult> (
     [FromQuery] string? lang,
     [FromServices] DbOptions options) =>
 {
@@ -52,7 +54,7 @@ app.MapGet("/views", async Task<IResult> (
         });
 });
 
-app.MapPost("/node-types", async Task<IResult> (
+graphApi.MapPost("/node-types", async Task<IResult> (
     [FromBody] NodeTypesRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -72,7 +74,7 @@ app.MapPost("/node-types", async Task<IResult> (
         });
 });
 
-app.MapPost("/node-legends", async Task<IResult> (
+graphApi.MapPost("/node-legends", async Task<IResult> (
     [FromBody] LegendsRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -95,7 +97,7 @@ app.MapPost("/node-legends", async Task<IResult> (
         });
 });
 
-app.MapPost("/items", async Task<IResult> (
+graphApi.MapPost("/items", async Task<IResult> (
     [FromBody] ItemsRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -129,7 +131,7 @@ app.MapPost("/items", async Task<IResult> (
         });
 });
 
-app.MapPost("/expand", async Task<IResult> (
+graphApi.MapPost("/expand", async Task<IResult> (
     [FromBody] ExpandRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -171,7 +173,7 @@ app.MapPost("/expand", async Task<IResult> (
         });
 });
 
-app.MapGet("/master-nodes", async Task<IResult> (
+graphApi.MapGet("/master-nodes", async Task<IResult> (
     [FromQuery] string? lang,
     [FromQuery] string? userId,
     [FromQuery] bool? includeInactive,
@@ -224,7 +226,7 @@ app.MapGet("/master-nodes", async Task<IResult> (
     }
 });
 
-app.MapGet("/group-nodes", async Task<IResult> (
+graphApi.MapGet("/group-nodes", async Task<IResult> (
     [FromQuery] string? lang,
     [FromServices] DbOptions options) =>
 {
@@ -239,7 +241,7 @@ app.MapGet("/group-nodes", async Task<IResult> (
         });
 });
 
-app.MapPost("/master-nodes/update", async Task<IResult> (
+graphApi.MapPost("/master-nodes/update", async Task<IResult> (
     [FromBody] MasterNodeUpdateRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -268,7 +270,7 @@ app.MapPost("/master-nodes/update", async Task<IResult> (
         });
 });
 
-app.MapGet("/master-relations", async Task<IResult> (
+graphApi.MapGet("/master-relations", async Task<IResult> (
     [FromQuery] string? lang,
     [FromServices] DbOptions options) =>
 {
@@ -283,7 +285,7 @@ app.MapGet("/master-relations", async Task<IResult> (
         });
 });
 
-app.MapPost("/master-relations/save", async Task<IResult> (
+graphApi.MapPost("/master-relations/save", async Task<IResult> (
     [FromBody] SaveRelationRequest? request,
     [FromServices] DbOptions options) =>
 {
@@ -328,7 +330,7 @@ app.MapPost("/master-relations/save", async Task<IResult> (
         });
 });
 
-app.MapPost("/master-relations/delete", async Task<IResult> (
+graphApi.MapPost("/master-relations/delete", async Task<IResult> (
     [FromBody] DeleteRelationRequest? request,
     [FromServices] DbOptions options) =>
 {
