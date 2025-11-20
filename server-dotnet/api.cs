@@ -20,25 +20,19 @@ var connectionString =
 
 builder.Services.AddSingleton(new DbOptions(connectionString));
 
+var frontendOrigin = builder.Configuration["FrontendOrigin"] ?? "http://localhost:5080";
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(frontendOrigin)
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 var app = builder.Build();
 
-#region Static frontend
-var frontendRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, ".."));
-var indexFile = Path.Combine(frontendRoot, "index.html");
-if (File.Exists(indexFile))
-{
-    var fileProvider = new PhysicalFileProvider(frontendRoot);
-    var options = new FileServerOptions
-    {
-        FileProvider = fileProvider,
-        EnableDefaultFiles = true
-    };
-    options.DefaultFilesOptions.DefaultFileNames.Clear();
-    options.DefaultFilesOptions.DefaultFileNames.Add("index.html");
-    app.UseFileServer(options);
-    app.MapFallback(() => Results.File(indexFile, "text/html"));
-}
-#endregion
+
+app.UseCors();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", utc = DateTimeOffset.UtcNow }));
 
