@@ -6,7 +6,7 @@ set "SERVER_URL=http://localhost:5050"
 for %%I in ("%~dp0.") do set "FRONTEND_DIR=%%~fI"
 set "STATIC_SERVER_DIR=%~dp0static-server"
 set "FRONTEND_PORT=5080"
-set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%/"
+set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%/start.html"
 set "FRONTEND_ROOT=%FRONTEND_DIR%"
 
 echo Starting .NET server from "%SERVER_DIR%" on %SERVER_URL% ...
