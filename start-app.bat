@@ -6,7 +6,8 @@ set "SERVER_URL=http://localhost:5050"
 for %%I in ("%~dp0.") do set "FRONTEND_DIR=%%~fI"
 set "STATIC_SERVER_DIR=%~dp0static-server"
 set "FRONTEND_PORT=5080"
-set "FRONTEND_URL=http://localhost:%FRONTEND_PORT%/start.html"
+set "FRONTEND_ORIGIN=http://localhost:%FRONTEND_PORT%"
+set "FRONTEND_URL=%FRONTEND_ORIGIN%/start.html"
 set "FRONTEND_ROOT=%FRONTEND_DIR%"
 
 echo Starting .NET server from "%SERVER_DIR%" on %SERVER_URL% ...
@@ -28,8 +29,8 @@ goto done
 echo Health response:
 powershell -NoLogo -NoProfile -Command "Invoke-RestMethod -Uri '%SERVER_URL%/health' -TimeoutSec 2 | ConvertTo-Json -Compress"
 
-echo Starting static file server from "%FRONTEND_DIR%" on %FRONTEND_URL% ...
-start "Static Server" cmd /k "cd /d ""%STATIC_SERVER_DIR%"" && dotnet run --urls=%FRONTEND_URL%"
+echo Starting static file server from "%FRONTEND_DIR%" on %FRONTEND_ORIGIN% ...
+start "Static Server" cmd /k "cd /d ""%STATIC_SERVER_DIR%"" && dotnet run --urls=%FRONTEND_ORIGIN%"
 
 set "FRONTEND_TRIES=15"
 echo Waiting for frontend server...
