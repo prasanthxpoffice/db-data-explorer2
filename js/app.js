@@ -6,6 +6,25 @@ if (!NodeUtils) {
 }
 const { buildNodeKey, buildRole, mergeRole: mergeRoleIntoNode } = NodeUtils;
 
+(function ensureAppConfig() {
+  if (window.APP_CONFIG) return;
+  const candidates = [window.parent, window.top, window.opener].filter(
+    (candidate, index, arr) =>
+      candidate && candidate !== window && arr.indexOf(candidate) === index
+  );
+
+  for (const source of candidates) {
+    try {
+      if (source?.APP_CONFIG) {
+        window.APP_CONFIG = source.APP_CONFIG;
+        return;
+      }
+    } catch (error) {
+      console.warn("Unable to access APP_CONFIG from parent window.", error);
+    }
+  }
+})();
+
 function escapeHtml(val = "") {
   return String(val)
     .replace(/&/g, "&amp;")
